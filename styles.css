@@ -101,71 +101,41 @@ main{margin-left:0;padding:106px 28px 25px;max-width:1100px;margin-right:auto;ma
 .latestScores{margin-top:22px}.scoresTitle{display:flex;align-items:center;justify-content:space-between}.scoresTitle h2{font-size:20px;color:var(--gold)}.scoresTitle a{color:#2f9cff}.scoresList{border:1px solid #1d3a50;border-radius:8px;overflow:hidden}.scoreLine{display:grid;grid-template-columns:35px 42px 1fr auto;gap:12px;align-items:center;padding:8px 18px;border-bottom:1px solid #173247;cursor:pointer}.scoreLine:last-child{border-bottom:0}.scoreLine img{width:34px;height:34px;border-radius:50%;object-fit:cover}.scorePosition{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#213140;font-weight:900}.scorePosition.p1{background:#f3bf1f;color:#07131e}.scorePosition.p2{background:#d3d9df;color:#07131e}.scorePosition.p3{background:#e0762b;color:#07131e}.scoreLine strong{font-size:22px;text-align:right}.scoreLine strong small{display:block;font-size:9px;font-weight:400}.landingKpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:24px}.landingKpis>div{border:1px solid #1c394e;border-radius:8px;padding:15px;text-align:center;background:#071722}.landingKpis small{display:block;color:var(--gold);font-size:9px}.landingKpis strong{display:block;font-size:22px;margin:10px 0}.landingKpis span{font-size:10px;color:#a8b6c1}
 @media(max-width:800px){.topbar.landingTopbar{height:74px}.landingTopbar .brand img{width:155px}.landingTopbar #mobileMenu{right:16px;top:15px;font-size:34px}main{padding:84px 8px 18px}.showcaseWelcome{padding:2px 4px 7px}.showcaseWelcome h1{font-size:18px}.showcaseWelcome p{font-size:13px}.showcaseHeading{padding:7px 2px 3px}.showcaseHeading h2{font-size:14px}.showcaseHeading p{font-size:11px}.showcasePodium{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:9px 4px 8px}.showcasePlayer.place1{transform:translateY(-8px)}.medalBadge{left:-4px;top:-7px;width:30px;height:30px;border-width:3px;font-size:13px}.showcasePhoto,.place1 .showcasePhoto{height:88px}.place1 .showcasePhoto{height:105px}.playerNameBand{padding:4px 1px;font-size:9px}.showcaseBody{padding:5px 3px}.showcaseBody>small{font-size:6px}.showcaseBody>strong{font-size:20px;margin:2px}.showcaseFacts span,.showcaseHcp span{font-size:6px}.showcaseFacts b{font-size:9px}.showcaseFacts div{padding:3px 0}.showcaseHcp{padding:3px}.showcaseHcp b{font-size:9px}.showcaseBody button{font-size:6px;padding:5px 1px}.podiumBase{height:39px;margin:0 -3px -39px}.podiumBase b{font-size:21px}.place1 .podiumBase{height:48px}.place3 .podiumBase{height:34px}.latestEventCard{margin-top:52px;grid-template-columns:72px 1fr;padding:10px;gap:10px}.eventPoster{height:70px}.posterGlow{font-size:8px}.posterGlow b{font-size:13px}.eventDetails>span{font-size:8px}.eventDetails h2{font-size:14px;margin:4px 0}.eventDetails div{gap:5px;font-size:8px}.latestEventCard>a{grid-column:1/-1;text-align:center;padding:9px;font-size:10px}.scoresTitle h2{font-size:11px}.scoresTitle a{font-size:9px}.scoreLine{grid-template-columns:27px 30px 1fr auto;padding:6px 8px;gap:7px}.scoreLine img{width:27px;height:27px}.scorePosition{width:23px;height:23px;font-size:10px}.scoreLine b{font-size:11px}.scoreLine strong{font-size:15px}.landingKpis{grid-template-columns:repeat(2,1fr);gap:7px}.landingKpis>div:last-child{grid-column:1/-1}.landingKpis strong{font-size:16px}.socialLinks{margin-top:8px}footer{padding:17px 8px}.footerMeta{display:none}}
 
-/* V1.8.1 mobile landing hotfix: keep the main menu fully outside page flow until opened */
+/* FLPR Premium v2.0.2 — Milestone 1 definitive interaction contract */
+body.menuOpen{overflow:hidden}
+body.menuOpen:after{content:none!important;display:none!important;pointer-events:none!important}
+.topbar.landingTopbar{z-index:100;pointer-events:none}
+.topbar.landingTopbar .brand,
+.topbar.landingTopbar #mobileMenu,
+.topbar.landingTopbar #topnav{pointer-events:auto}
+#mobileMenu{touch-action:manipulation;-webkit-tap-highlight-color:rgba(244,191,32,.22)}
 .topbar #topnav{
-  left:auto !important;
-  right:0 !important;
-  top:0 !important;
+  left:auto!important;
+  right:0!important;
+  top:0!important;
+  z-index:110!important;
+  width:min(350px,88vw)!important;
+  height:100dvh!important;
+  display:flex!important;
+  flex-direction:column!important;
   transform:translateX(105%);
   visibility:hidden;
-  pointer-events:none;
   opacity:0;
-  transition:transform .28s ease,opacity .2s ease,visibility 0s linear .28s;
+  pointer-events:none!important;
+  transition:transform .25s ease,opacity .18s ease,visibility 0s linear .25s;
 }
 .topbar #topnav.open{
   transform:translateX(0);
   visibility:visible;
-  pointer-events:auto;
   opacity:1;
-  transition:transform .28s ease,opacity .2s ease;
+  pointer-events:auto!important;
+  transition:transform .25s ease,opacity .18s ease;
 }
-body.menuOpen{overflow:hidden}
-@media(max-width:800px){
-  .topbar #topnav{
-    width:min(350px,88vw) !important;
-    height:100dvh !important;
-    display:flex !important;
-    flex-direction:column !important;
-    position:fixed !important;
-    margin:0 !important;
-  }
-  /* Podium appears immediately below the compact header on phones. */
-  main{padding-top:78px !important}
-}
-
-
-/* V1.8.3 interaction reliability fix */
-.topbar.landingTopbar{z-index:100}
-.topbar #topnav{z-index:102}
-body.menuOpen:after{z-index:99}
-.latestEventCard>a,.scoresTitle a,.infoLinks a,.backBtn,.scorecardBtn{position:relative;z-index:2;pointer-events:auto;touch-action:manipulation}
-.showcasePlayer,.scoreLine,.rankRow,.playerTile,[data-nav],#mobileMenu,.drawerClose{touch-action:manipulation}
-
-/* V1.8.4 definitive mobile interaction fix */
-body.menuOpen:after{content:none!important;display:none!important;pointer-events:none!important}
+.topbar #topnav.open a,.topbar #topnav.open button{pointer-events:auto!important;touch-action:manipulation}
+#menuBackdrop{position:fixed;inset:0;z-index:105;border:0;margin:0;padding:0;background:rgba(0,0,0,.68);cursor:pointer;touch-action:manipulation}
+#menuBackdrop[hidden]{display:none!important}
+#menuBackdrop.open{display:block}
 #app,#globalFooter{position:relative;z-index:1;pointer-events:auto}
-.topbar.landingTopbar{pointer-events:none}
-.topbar.landingTopbar .brand,.topbar.landingTopbar #mobileMenu,.topbar.landingTopbar #topnav{pointer-events:auto}
-[data-route],[data-player],.latestEventCard>a,.scoresTitle a,.backBtn,.scorecardBtn{cursor:pointer!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(244,191,32,.22)}
-#topnav:not(.open){pointer-events:none!important}
-#topnav.open{pointer-events:auto!important}
-
-/* FLPR Premium v2.0 Stable — native navigation contract */
-a[href^="#"],button,[data-player]{touch-action:manipulation;-webkit-tap-highlight-color:rgba(244,191,32,.22)}
-#topnav.open a{pointer-events:auto!important;position:relative;z-index:104}
-#topnav:not(.open){pointer-events:none!important}
-#topnav:not(.open) a{pointer-events:none!important}
-.latestEventCard>a,.scoresTitle>a,.backBtn,.scorePanelHead>a,.infoLinks>a{pointer-events:auto!important;position:relative;z-index:5}
-
-/* FLPR Premium v2.0 Milestone 1 — definitive navigation layer */
-.topbar.landingTopbar{pointer-events:auto!important;z-index:100!important}
-#mobileMenu{z-index:203!important;pointer-events:auto!important;touch-action:manipulation}
-#topnav{position:fixed!important;top:0!important;right:0!important;left:auto!important;width:min(350px,88vw)!important;height:100dvh!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;transform:translateX(105%)!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;z-index:202!important;transition:transform .25s ease,opacity .2s ease,visibility 0s linear .25s!important}
-#topnav.open{transform:translateX(0)!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;transition:transform .25s ease,opacity .2s ease!important}
-#topnav a,#topnav button{pointer-events:auto!important;touch-action:manipulation!important}
-#menuBackdrop{display:block;position:fixed;inset:0;border:0;padding:0;background:#0009;opacity:0;visibility:hidden;pointer-events:none;z-index:201;transition:opacity .2s ease,visibility 0s linear .2s}
-body.menuOpen #menuBackdrop{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .2s ease}
-body.menuOpen:after{content:none!important;display:none!important;pointer-events:none!important}
-#app,#globalFooter{position:relative;z-index:1;pointer-events:auto!important}
-#app a,#app button,[data-player]{pointer-events:auto!important;touch-action:manipulation!important}
-@media(min-width:801px){#mobileMenu{display:block!important}}
+a[href^="#"],[data-player],[data-action]{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(244,191,32,.22)}
+.latestEventCard>a,.scoresTitle>a,.backBtn,.scorePanelHead>a,.infoLinks>a{position:relative;z-index:2;pointer-events:auto}
+@media(max-width:800px){main{padding-top:78px!important}}
