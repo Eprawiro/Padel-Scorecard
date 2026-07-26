@@ -1,10 +1,11 @@
-# FLPR Premium Final Production Candidate 3
+# FLPR Premium v1.0 Final Release
 
-Flat Netlify package. No build step.
+Production-ready static FLPR website for direct GitHub → Netlify deployment.
 
-Added: Hall of Fame, complete statistics leaderboards, consistency and momentum in ranking, Tournament Center statistics and champion history, and expanded Player Scorecards with radar, rating/ranking/handicap profiles, intelligence, achievements, partner/opponent matrix, and coaching outlook.
+- Flat directory
+- No npm, React, Vite, or build process
+- Workbook-derived ranking and analytics
+- Verified tournament archive workflow
+- Responsive player scorecards and statistics definitions
 
-Important: the official Sandy photo is not present in the supplied file set, so a neutral placeholder is retained rather than assigning the wrong person.
-
-
-Final Production Candidate 3 adds Sandy's official photo, expanded Statistics Center leaderboards, and an accessible information popup for every statistics parameter.
+Upload all files to the repository root. See `ADMIN_GUIDE.md`, `USER_GUIDE.md`, `TECHNICAL_DOCUMENTATION.md`, `RELEASE_NOTES.md`, and `TEST_REPORT.md`.
