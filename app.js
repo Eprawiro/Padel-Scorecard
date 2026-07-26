@@ -2,14 +2,6 @@ const ICONS={dashboard:'⌂',ranking:'♛',players:'♟',statistics:'▥',tourna
 const ROUTES=[['dashboard','Dashboard'],['tournaments','View Tournament'],['scoreboard','Full Scoreboard'],['ranking','Live Ranking'],['players','Players'],['statistics','Statistics'],['handicap','Handicap'],['partners','Partner Matrix'],['awards','Awards'],['hall','Hall of Fame'],['import','Data Import'],['settings','Settings'],['about','About FLPR']];
 const PHOTOS={'edy-sp':'player-edy-sp.jpg','alwin':'player-alwin.jpg','donny':'player-donny.jpg','austin':'player-austin.jpg','ronald':'player-ronald.jpg','thohir':'player-thohir.jpg','welly':'player-welly.jpg','michael':'player-michael.jpg'};
 let D;
-const TOURNAMENT_STORAGE_KEY='flpr-tournament-archive-v1';
-const TOURNAMENT_SOURCES=[
- {id:'T1',name:'JakSel T1 — Weekly Americano',date:'15 June 2026',place:'Jakarta Selatan',format:'Americano · 2 Courts',url:'https://americano-padel.com/r/0110a7d0-aaac-45ae-998c-b3731405a11f'},
- {id:'T2',name:'JakSel T2 — Weekly Americano',date:'22 June 2026',place:'Jakarta Selatan',format:'Americano',url:'https://americano-padel.com/r/6f00be02-97ee-4656-aa37-ea2390ff8a3a'},
- {id:'T3',name:'JakSel T3 — Weekly Americano',date:'29 June 2026',place:'Jakarta Selatan',format:'Americano',url:'https://americano-padel.com/r/99e181d8-c5dd-4f73-8a73-c40f4303551b'},
- {id:'T4',name:'JakSel T4 — Weekly Americano',date:'06 July 2026',place:'Jakarta Selatan',format:'Americano',url:'https://americano-padel.com/r/75ab1fb5-691a-4d08-b73e-3813b4d94a0c'},
- {id:'T5',name:'JakSel T5 — Weekly Americano',date:'20 July 2026',place:'Jakarta Selatan',format:'Americano · 2 Courts',url:'https://americano-padel.com/r/7fa46469-6387-45d3-9900-4192386691fa'}
-];
 const app=document.getElementById('app');
 const topnav=document.getElementById('topnav');
 const sidebar=document.getElementById('sidebar');
@@ -61,10 +53,9 @@ function ensureAppShell(){
  }
  if(mobileMenu){
   mobileMenu.hidden=false;
-  mobileMenu.style.display='flex';
+  mobileMenu.style.display='block';
   mobileMenu.style.visibility='visible';
   mobileMenu.style.opacity='1';
-  if(mobileMenu.children.length!==3){mobileMenu.innerHTML='<span></span><span></span><span></span>';}
  }
 }
 function active(k){
@@ -106,87 +97,47 @@ function latestTournamentData(){
  return {name:'JakSel T5 — Weekly Americano',place:'Jakarta Selatan',date:'20 July 2026',format:'Americano · 2 Courts',rows};
 }
 
-function loadImportedTournaments(){
- try{
-  const parsed=JSON.parse(localStorage.getItem(TOURNAMENT_STORAGE_KEY)||'[]');
-  return Array.isArray(parsed)?parsed:[];
- }catch(error){console.warn('Tournament archive storage error',error);return []}
-}
-function saveImportedTournament(tournament){
- const current=loadImportedTournaments().filter(item=>item.id!==tournament.id);
- current.push(tournament);
- localStorage.setItem(TOURNAMENT_STORAGE_KEY,JSON.stringify(current));
-}
-function enrichTournamentRows(rows){
- return rows.map((row,index)=>{
-  const normalized=String(row.name||'').trim().toLowerCase();
-  const player=D.players.find(p=>p.name.toLowerCase()===normalized)||{};
-  return {...player,...row,eventRank:index+1,rank:player.rank||row.rank||null};
- });
-}
 function allTournamentData(){
  const latest=latestTournamentData();
- const imported=loadImportedTournaments();
- return TOURNAMENT_SOURCES.slice().reverse().map(source=>{
-  if(source.id==='T5')return {id:'T5',...source,...latest,matches:11,players:latest.rows.length,totalPoints:latest.rows.reduce((sum,row)=>sum+row.score,0)};
-  const saved=imported.find(item=>item.id===source.id);
-  return saved?{...source,...saved,rows:enrichTournamentRows(saved.rows||[])}:{...source,rows:[]};
- });
+ const historical=[
+  {id:'T4',name:'JakSel T4 — Weekly Americano',place:'Jakarta Selatan',date:'06 July 2026',format:'Americano',matches:11,players:null,totalPoints:null,rows:[]},
+  {id:'T3',name:'JakSel T3 — Weekly Americano',place:'Jakarta Selatan',date:'29 June 2026',format:'Americano',matches:11,players:null,totalPoints:null,rows:[]},
+  {id:'T2',name:'JakSel T2 — Weekly Americano',place:'Jakarta Selatan',date:'22 June 2026',format:'Americano',matches:12,players:null,totalPoints:null,rows:[]},
+  {id:'T1',name:'JakSel T1 — Weekly Americano',place:'Jakarta Selatan',date:'15 June 2026',format:'Americano · 2 Courts',matches:12,players:9,totalPoints:null,rows:[]}
+ ];
+ return [{id:'T5',...latest,matches:11,players:latest.rows.length,totalPoints:latest.rows.reduce((sum,row)=>sum+row.score,0)},...historical];
 }
-function normalizePlayerName(value){
- return String(value||'').replace(/^\d+[.)#-]?\s*/,'').replace(/\s+/g,' ').trim();
-}
-function parseAmericanoResult(rawText){
- const text=String(rawText||'').replace(/\r/g,'');
- const lines=text.split('\n').map(line=>line.trim()).filter(Boolean);
- const candidates=[];
- const ignored=/^(round|court|vs|points?|score|ranking|standings|position|player|matches|americano|mexicano|jaksel|completed|share|result)/i;
- for(let i=0;i<lines.length;i++){
-  const line=lines[i];
-  if(ignored.test(line))continue;
-  let match=line.match(/^\s*(?:#?\d+[.)-]?\s*)?([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40}?)\s+(\d{1,3})\s*(?:pts?|points?)?\s*$/i);
-  if(!match && i+1<lines.length && /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40}$/.test(line) && /^\d{1,3}(?:\s*(?:pts?|points?))?$/i.test(lines[i+1])){
-   match=[null,line,lines[i+1].match(/\d+/)[0]];i++;
-  }
-  if(match){
-   const name=normalizePlayerName(match[1]);
-   const score=Number(match[2]);
-   if(name.length>1 && score>=0 && score<=999)candidates.push({name,score});
-  }
- }
- const unique=[];const seen=new Set();
- for(const row of candidates){const key=row.name.toLowerCase();if(!seen.has(key)){seen.add(key);unique.push(row)}}
- unique.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
- return unique;
-}
-async function fetchAmericanoText(url){
- const response=await fetch(url,{mode:'cors',cache:'no-store'});
- if(!response.ok)throw Error(`Americano returned HTTP ${response.status}`);
- return await response.text();
-}
-function buildImportedTournament(source,rows){
- if(rows.length<3)throw Error('At least three ranked players are required. Paste the final standings with one player and score per line.');
- return {...source,players:rows.length,totalPoints:rows.reduce((sum,row)=>sum+Number(row.score||0),0),rows,importedAt:new Date().toISOString()};
-}
-function renderImportStatus(message,type='info'){
- const el=document.getElementById('importStatus');if(!el)return;
- el.className=`importStatus ${type}`;el.textContent=message;
-}
-
 function tournamentSummaryCard(t,index){
  const podium=(t.rows||[]).slice(0,3);
- const hasDetail=podium.length===3 && Number.isFinite(t.players) && Number.isFinite(t.totalPoints);
- if(!hasDetail){
-  return `<section class="card tournamentSummary tournamentArchiveCard tournamentMetadataOnly">
-   <div class="eventSummaryHead"><div><small>${index===0?'LATEST TOURNAMENT':'COMPLETED TOURNAMENT'}</small><h2>${esc(t.name)}</h2><p>${esc(t.place)} · ${esc(t.date)} · ${esc(t.format)}${t.matches?` · ${t.matches} Matches`:''}</p></div></div>
-   <div class="archiveUnavailable"><span>IMPORT REQUIRED</span><h3>Detailed tournament result is not stored in the current workbook</h3><p>Podium, player count, and total points will appear after this event’s original Americano result is imported into the structured tournament dataset.</p></div>
-  </section>`;
- }
+ const hasDetail=podium.length===3;
+ const placeholder=[1,2,3].map(place=>`<article class="pendingPodium"><span>#${place}</span><img src="generic-padel-avatar.svg" alt="Pending player"><div><b>Detailed result pending</b><small>Awaiting tournament import</small></div></article>`).join('');
  return `<section class="card tournamentSummary tournamentArchiveCard">
    <div class="eventSummaryHead"><div><small>${index===0?'LATEST TOURNAMENT':'COMPLETED TOURNAMENT'}</small><h2>${esc(t.name)}</h2><p>${esc(t.place)} · ${esc(t.date)} · ${esc(t.format)}${t.matches?` · ${t.matches} Matches`:''}</p></div></div>
-   <div class="summaryStats"><div><span>Players</span><b>${t.players}</b></div><div><span>Total Points</span><b>${t.totalPoints}</b></div><div><span>Champion</span><b>${esc(podium[0].name)}</b></div></div>
-   <div class="summaryPodium">${podium.map((p,i)=>`<article><span>#${i+1}</span><img src="${photo(p)}" alt="${esc(p.name)}"><div><b>${esc(p.name)}</b><small>${p.score} pts · FLPR #${p.rank||'—'}</small></div></article>`).join('')}</div>
+   <div class="summaryStats"><div><small>Players</small><strong>${t.players??'—'}</strong></div><div><small>Total Points</small><strong>${t.totalPoints??'—'}</strong></div><div><small>Champion</small><strong>${hasDetail?esc(podium[0].name):'Pending'}</strong></div></div>
+   <div class="summaryPodium">${hasDetail?podium.map((player,i)=>`<article data-player="${player.slug||''}"><span>#${i+1}</span><img src="${photo(player)}" alt="${esc(player.name)}"><div><b>${esc(player.name)}</b><small>${player.score} pts · FLPR #${player.rank||'—'}</small></div></article>`).join(''):placeholder}</div>
+   ${hasDetail?'':`<p class="tournamentPendingNote">Detailed podium, player count, and point totals will populate automatically after this tournament is added to the structured import dataset.</p>`}
   </section>`;
+}
+function tournamentPlayerRow(p){return `<tr data-player="${p.slug||''}"><td><span class="eventRank ${p.eventRank<=3?'podium':''}">${p.eventRank}</span></td><td><div class="landingPlayer"><img src="${photo(p)}"><div><b>${esc(p.name)}</b><small>${p.status||'Player'} · FLPR #${p.rank||'—'}</small></div></div></td><td class="scoreCell">${p.score}</td><td>${p.rating!=null?p.rating.toFixed(2):'—'}</td><td><span class="landingHcp">${p.handicap>0?'+':''}${p.handicap??'—'}</span></td><td>${esc(p.bestPartner)}</td></tr>`}
+function dashboard(){
+ active('dashboard');
+ const t=latestTournamentData(), podium=t.rows.slice(0,3);
+ const totalPoints=t.rows.reduce((a,b)=>a+b.score,0);
+ const podiumCard=(p,place)=>`<article class="showcasePlayer place${place}" data-player="${p.slug||''}">
+   <div class="medalBadge">${place}</div>
+   <div class="showcasePhoto"><img src="${photo(p)}" alt="${esc(p.name)}"></div>
+   <div class="playerNameBand">${esc(p.name)}</div>
+   <div class="showcaseBody"><small>TOURNAMENT SCORE</small><strong>${p.score}</strong><div class="showcaseFacts"><div><span>FLPR Rank</span><b>${p.rank||'—'}</b></div><div><span>FL Padel Rating</span><b>${p.rating?.toFixed?.(2)||'—'}</b></div></div><div class="showcaseHcp"><span>Handicap</span><b>${p.handicap>0?'+':''}${p.handicap??'—'}</b></div><button>▣ Player Scorecard</button></div>
+   <div class="podiumBase"><b>${place}</b></div>
+  </article>`;
+ app.innerHTML=`<div class="showcaseLanding">
+  <section class="showcaseWelcome"><h1>WELCOME TO FLPR PREMIUM</h1><p>FL Padel Ranking System</p></section>
+  <section class="showcaseHeading"><h2>❧ &nbsp; LATEST TOURNAMENT WINNERS &nbsp; ❧</h2><p>Top 3 Champions</p></section>
+  <section class="showcasePodium">${podiumCard(podium[1]||podium[0],2)}${podiumCard(podium[0],1)}${podiumCard(podium[2]||podium[0],3)}</section>
+  <section class="latestEventCard card"><div class="eventPoster"><div class="posterGlow">AMERICANO<br><b>PADEL</b></div></div><div class="eventDetails"><span>LATEST TOURNAMENT</span><h2>${esc(t.name)}</h2><div><b>⌖ ${esc(t.place)}</b><b>▣ ${esc(t.date)}</b><b>▦ ${esc(t.format)}</b></div></div><a href="#tournaments">View Tournament →</a></section>
+  <section class="latestScores"><div class="scoresTitle"><h2>▥ &nbsp; TOP SCORES – LATEST TOURNAMENT</h2><a href="#scoreboard">View Full Scoreboard →</a></div><div class="scoresList">${t.rows.slice(0,5).map(p=>`<div class="scoreLine" data-player="${p.slug||''}"><span class="scorePosition p${p.eventRank}">${p.eventRank}</span><img src="${photo(p)}"><b>${esc(p.name)}</b><strong>${p.score}<small>Points</small></strong></div>`).join('')}</div></section>
+  <section class="landingKpis"><div><small>TOTAL PLAYERS</small><strong>♙ ${D.players.length}</strong><span>Active Players</span></div><div><small>TOTAL TOURNAMENTS</small><strong>🏆 5</strong><span>Completed</span></div><div><small>TOTAL POINTS</small><strong>◉ ${totalPoints}</strong><span>Latest Event</span></div><div><small>PLAYERS / TOURNAMENT</small><strong>♙ ${t.rows.length}</strong><span>Players</span></div><div><small>LATEST UPDATE</small><strong>◷ ${esc(t.date)}</strong><span>${esc(t.place)}</span></div></section>
+ </div>`;
 }
 function head(title,subtitle=''){
  return `<header class="pageHead"><div><h1>${esc(title)}</h1>${subtitle?`<p>${esc(subtitle)}</p>`:''}</div></header>`;
@@ -208,15 +159,7 @@ function handicap(){active('handicap');app.innerHTML=head('Handicap Engine','Bal
 function partners(){active('partners');app.innerHTML=head('Partner Matrix','Best combinations and difficult matchups.')+`<div class="grid playerGrid">${D.players.map(p=>`<div class="card playerTile"><img src="${photo(p)}"><h3>${esc(p.name)}</h3><p>Best partner</p><strong>${esc(p.analysis.bestPartner?.name||'Insufficient data')}</strong><p>${p.analysis.bestPartner?`${p.analysis.bestPartner.winRate}% win rate · ${p.analysis.bestPartner.matches} matches`:''}</p></div>`).join('')}</div>`}
 function awards(){active('awards');app.innerHTML=head('Awards','Official FLPR season recognition.')+`<div class="grid playerGrid">${D.awards.map((a,i)=>`<div class="card playerTile"><div style="font-size:44px">${['🏆','⭐','🥇','🔥','🎯','🤝','📈','🧱','⚡','♛','🏅'][i]||'🏅'}</div><h3>${esc(a.award)}</h3><strong style="color:#f4c52d">${esc(a.winner)}</strong><p>${esc(a.metric)} · ${esc(a.rule)}</p><p>Runner-up: ${esc(a.runnerUp)}</p></div>`).join('')}</div>`}
 function hall(){active('hall');app.innerHTML=head('Hall of Fame','Players and performances defining the FLPR legacy.')+`<div class="card profileCard" style="text-align:center"><div style="font-size:75px">♛</div><small>Current FLPR Champion</small><h1 style="font-size:48px;margin:10px">${esc(D.players[0].name)}</h1><img class="heroPhoto" style="height:230px" src="${photo(D.players[0])}"><div class="bigRating">${D.players[0].rating.toFixed(2)}</div><p>${D.players[0].wins} wins from ${D.players[0].matches} matches</p></div>`}
-function importPage(){
- active('import');ensureAppShell();document.body.classList.add('importRoute');
- const options=TOURNAMENT_SOURCES.map(t=>`<option value="${t.id}">${t.id} · ${esc(t.name)} · ${esc(t.date)}</option>`).join('');
- const existing=loadImportedTournaments();
- app.innerHTML=head('Historical Tournament Import','Import T1–T4 from Americano result links and populate the tournament archive automatically.')+`<div class="card formCard importEngine"><h2>Americano Historical Import</h2><p class="note">Choose a tournament and press <b>Fetch & Import</b>. If Americano blocks direct browser access, copy the final standings from the result page and paste them below. The parser accepts <b>Player Name 23</b> or a player name followed by its score on the next line.</p><label>Tournament</label><select id="importTournament">${options}</select><label>Americano result URL</label><input id="importUrl" value="${TOURNAMENT_SOURCES[0].url}" autocomplete="off"><div class="importActions"><button class="btn" type="button" data-action="fetch-import">Fetch & Import</button><a class="heroSecondary" id="openSource" href="${TOURNAMENT_SOURCES[0].url}" target="_blank" rel="noopener">Open Source Page</a></div><label>Fallback: paste final standings</label><textarea id="importRaw" rows="12" placeholder="Austin 23&#10;Sandy 22&#10;Michael 19&#10;..."></textarea><button class="btn" type="button" data-action="parse-import">Parse Pasted Result</button><div id="importStatus" class="importStatus">No import is running.</div></div><div class="card formCard"><h2>Archive Status</h2><div class="archiveStatus">${TOURNAMENT_SOURCES.map(t=>{const saved=t.id==='T5'||existing.some(x=>x.id===t.id);return `<div><b>${t.id}</b><span>${saved?'Ready':'Awaiting import'}</span></div>`}).join('')}</div><p class="note">Imported data is stored in this browser. After confirming the results, use <b>Export Archive JSON</b> and commit the downloaded JSON in the next production-data release.</p><button class="btn" type="button" data-action="export-archive">Export Archive JSON</button></div>`;
- const select=document.getElementById('importTournament');
- select.addEventListener('change',()=>{const source=TOURNAMENT_SOURCES.find(t=>t.id===select.value);document.getElementById('importUrl').value=source.url;document.getElementById('openSource').href=source.url;});
-}
-
+function importPage(){active('import');ensureAppShell();document.body.classList.add('importRoute');app.innerHTML=head('Data Import','Workbook-driven update center for Netlify and GitHub.')+`<div class="card formCard"><h2>FLPR Master Workbook</h2><p class="note">This production package is generated from <b>FLPR_Master_Workbook_v2.6_PhaseC_Complete.xlsx</b>. For automatic GitHub–Netlify deployment, replace the workbook and regenerate <b>flpr-data.json</b> before committing.</p><label>Americano Padel result URL</label><input placeholder="https://americano-padel.com/r/..."><button class="btn" type="button" data-action="validate-import">Validate URL</button></div>`}
 function settings(){active('settings');app.innerHTML=head('Settings','Display and system preferences.')+`<div class="card formCard"><label>Default player profile</label><select><option>Edy SP</option><option>Top ranked player</option></select><label>Ranking display</label><select><option>Official FLPR Rating</option><option>Win Rate</option></select><p class="note">Settings are stored locally in the browser in the next release.</p></div>`}
 function about(){active('about');app.innerHTML=head('About FLPR','Fair. Dynamic. Competitive.')+`<div class="card formCard"><h2>Every Point Matters</h2><p>FLPR is a ranking and handicap engine for recurring padel communities. It combines performance, opponent difficulty, consistency, recent form, and reliability.</p><p>The current database contains <b>${D.players.length} players</b>, <b>${D.kpis['Valid Matches']} valid matches</b>, and <b>${D.kpis['Player-Match Records']} player-match records</b>.</p></div>`}
 function playerPage(slug){
@@ -295,37 +238,9 @@ function handleAppClick(event){
   const action=actionTarget.dataset.action;
   if(action==='close-menu'){event.preventDefault();closeMenu();return;}
   if(action==='print'){event.preventDefault();window.print();return;}
-  if(action==='fetch-import'){
+  if(action==='validate-import'){
    event.preventDefault();
-   const id=document.getElementById('importTournament')?.value;
-   const source=TOURNAMENT_SOURCES.find(t=>t.id===id);
-   const url=document.getElementById('importUrl')?.value.trim();
-   renderImportStatus('Connecting to Americano…');
-   fetchAmericanoText(url).then(html=>{
-    const doc=new DOMParser().parseFromString(html,'text/html');
-    const rows=parseAmericanoResult(doc.body?.innerText||html);
-    const tournament=buildImportedTournament({...source,url},rows);
-    saveImportedTournament(tournament);renderImportStatus(`${source.id} imported: ${rows.length} players, ${tournament.totalPoints} total points.`,'success');
-   }).catch(error=>renderImportStatus(`Direct fetch was blocked or could not be parsed: ${error.message}. Open the source page, copy the final standings, then use Parse Pasted Result.`,'warning'));
-   return;
-  }
-  if(action==='parse-import'){
-   event.preventDefault();
-   try{
-    const id=document.getElementById('importTournament')?.value;
-    const source=TOURNAMENT_SOURCES.find(t=>t.id===id);
-    const url=document.getElementById('importUrl')?.value.trim()||source.url;
-    const rows=parseAmericanoResult(document.getElementById('importRaw')?.value);
-    const tournament=buildImportedTournament({...source,url},rows);
-    saveImportedTournament(tournament);renderImportStatus(`${source.id} imported: ${rows.length} players, ${tournament.totalPoints} total points.`,'success');
-   }catch(error){renderImportStatus(error.message,'error')}
-   return;
-  }
-  if(action==='export-archive'){
-   event.preventDefault();
-   const payload={schema:'flpr-tournament-archive-v1',exportedAt:new Date().toISOString(),tournaments:loadImportedTournaments()};
-   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='flpr-tournament-archive.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+   alert('Import staging requires the server-enabled FLPR edition. This static production package keeps official data read-only.');
    return;
   }
  }
