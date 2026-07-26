@@ -9,3 +9,12 @@
 - Added verified local tournament import, preview, storage, and archive export.
 - Added official supplied photos for Sandy, Nicholas, David, Hansen, Donny, Ricky, Reza, and Kennard, plus existing mapped photos.
 - Preserved flat Netlify deployment with no build process.
+
+
+## Phase 1 Complete Polish
+- Added at-a-glance Performance Command Center to every player scorecard.
+- Upgraded verified tournament history to a visual timeline with placement icons.
+- Added Favorite Partner and Primary Rival highlights.
+- Added information icons to all Statistical Profile bars.
+- Added progressive chart and metric animations with reduced-motion accessibility.
+- Retained avatar fallback for players without an official photo.
