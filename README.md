@@ -20,3 +20,6 @@ Production static application matching the approved FLPR Premium dashboard direc
 - Premium performance radar, core metrics, rating intelligence, strengths/development areas, partner/opponent matrix, rating drivers, data status
 - Print / Save as PDF button
 - Responsive mobile layout
+## FLPR PREMIUM V1.3
+- Player Scorecard retained and connected to all player cards.
+- Edy SP profile photo updated with the newly supplied image.
