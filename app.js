@@ -7,38 +7,7 @@ const topnav=document.getElementById('topnav');
 const sidebar=document.getElementById('sidebar');
 const mobileMenu=document.getElementById('mobileMenu');
 const $=s=>document.querySelector(s); const photo=p=>PHOTOS[p.slug]||'generic-padel-avatar.svg'; const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function navigateTo(routeName){
- const target=String(routeName||'dashboard').replace(/^#/,'');
- if(location.hash==='#'+target){ route(); }
- else { location.hash=target; }
-}
-window.navigateTo=navigateTo;
-function menus(){
- topnav.innerHTML=`<div class="drawerHead"><strong>FLPR MENU</strong><button class="drawerClose" type="button" aria-label="Close navigation menu">×</button></div>${ROUTES.map(([k,v])=>`<a href="#${k}" data-nav="${k}"><span>${ICONS[k]}</span>${v}</a>`).join('')}`;
- sidebar.innerHTML='';
- topnav.setAttribute('aria-hidden','true');
- const setMenu=open=>{
-  topnav.classList.toggle('open',open);
-  document.body.classList.toggle('menuOpen',open);
-  mobileMenu.setAttribute('aria-expanded',String(open));
-  topnav.setAttribute('aria-hidden',String(!open));
- };
- window.setFLPRMenu=setMenu;
- mobileMenu.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();setMenu(!topnav.classList.contains('open'))});
- topnav.querySelector('.drawerClose').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();setMenu(false)});
- topnav.addEventListener('click',e=>{
-  const link=e.target.closest('a[data-nav]');
-  if(!link)return;
-  e.preventDefault();
-  e.stopPropagation();
-  const destination=link.dataset.nav;
-  setMenu(false);
-  navigateTo(destination);
- });
- document.addEventListener('click',e=>{if(topnav.classList.contains('open')&&!topnav.contains(e.target)&&!mobileMenu.contains(e.target))setMenu(false)});
- document.addEventListener('keydown',e=>{if(e.key==='Escape')setMenu(false)});
-}
-
+function menus(){topnav.innerHTML=`<div class="drawerHead"><strong>FLPR MENU</strong><button class="drawerClose" type="button" aria-label="Close navigation menu">×</button></div>${ROUTES.map(([k,v])=>`<a href="#${k}" data-nav="${k}"><span>${ICONS[k]}</span>${v}</a>`).join('')}`;sidebar.innerHTML='';topnav.setAttribute('aria-hidden','true');const setMenu=open=>{topnav.classList.toggle('open',open);document.body.classList.toggle('menuOpen',open);mobileMenu.setAttribute('aria-expanded',String(open));topnav.setAttribute('aria-hidden',String(!open))};window.setFLPRMenu=setMenu;mobileMenu.onclick=e=>{e.stopPropagation();setMenu(!topnav.classList.contains('open'))};topnav.querySelector('.drawerClose').onclick=e=>{e.preventDefault();e.stopPropagation();setMenu(false)};topnav.addEventListener('click',e=>{const link=e.target.closest('a[data-nav]');if(!link)return;setMenu(false)});document.addEventListener('click',e=>{if(topnav.classList.contains('open')&&!topnav.contains(e.target)&&!mobileMenu.contains(e.target))setMenu(false)});document.addEventListener('keydown',e=>{if(e.key==='Escape')setMenu(false)})}
 function active(k){document.querySelectorAll('[data-nav]').forEach(x=>x.classList.toggle('active',x.dataset.nav===k));topnav.classList.remove('open');document.body.classList.remove('menuOpen');mobileMenu.setAttribute('aria-expanded','false');topnav.setAttribute('aria-hidden','true')}
 function profile(){return D.players.find(p=>p.slug==='edy-sp')||D.players[0]}
 function rankRows(n=8){return D.players.slice(0,n).map(p=>`<div class="rankRow" onclick="openPlayer('${p.slug}')"><span class="rankNo">${p.rank}</span><img class="avatar" src="${photo(p)}"><div><div class="rankName">${esc(p.name)}</div><div class="rankMeta">FLPR ${p.rating.toFixed(2)}</div></div><div class="hcp">HCP<b>${p.handicap>0?'+':''}${p.handicap}</b></div></div>`).join('')}
@@ -132,13 +101,4 @@ function playerPage(slug){
 function openPlayer(slug){ location.hash='player/'+slug; }
 window.openPlayer=openPlayer;
 function route(){let h=location.hash.slice(1)||'dashboard';if(h.startsWith('player/'))return playerPage(h.split('/')[1]);({dashboard,ranking,players,statistics,tournaments,handicap,partners,awards,hall,import:importPage,settings,about}[h]||dashboard)()}
-
-document.addEventListener('click',e=>{
- const link=e.target.closest('a[href^="#"]');
- if(!link || link.dataset.nav)return;
- const destination=link.getAttribute('href').slice(1);
- if(!destination)return;
- e.preventDefault();
- navigateTo(destination);
-});
 fetch('flpr-data.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(d=>{D=d;menus();route();addEventListener('hashchange',route)}).catch(e=>app.innerHTML=`<div class="card formCard"><h1>FLPR data could not load</h1><p>${esc(e.message)}</p></div>`);

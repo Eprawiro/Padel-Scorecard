@@ -132,11 +132,3 @@ body.menuOpen{overflow:hidden}
   /* Podium appears immediately below the compact header on phones. */
   main{padding-top:78px !important}
 }
-
-
-/* V1.8.3 interaction reliability fix */
-.topbar.landingTopbar{z-index:100}
-.topbar #topnav{z-index:102}
-body.menuOpen:after{z-index:99}
-.latestEventCard>a,.scoresTitle a,.infoLinks a,.backBtn,.scorecardBtn{position:relative;z-index:2;pointer-events:auto;touch-action:manipulation}
-.showcasePlayer,.scoreLine,.rankRow,.playerTile,[data-nav],#mobileMenu,.drawerClose{touch-action:manipulation}
