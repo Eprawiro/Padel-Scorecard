@@ -54,6 +54,7 @@ function dashboard(){
 
   <section class="sectionIntro"><div><span>TOURNAMENT PODIUM</span><h2>Latest Winners</h2></div><p>The top three are determined by total points scored in JakSel T5.</p></section>
   <section class="podiumGrid">${podium.map((p,i)=>`<article class="podiumCard card place${i+1}" onclick="openPlayer('${p.slug||''}')"><div class="podiumPlace">${['1ST','2ND','3RD'][i]} PLACE</div><div class="podiumPhoto"><img src="${photo(p)}"><span>${['🏆','🥈','🥉'][i]}</span></div><h3>${esc(p.name)}</h3><div class="podiumScore">${p.score}<small>TOTAL SCORE</small></div><div class="podiumFacts"><div><small>FLPR Rank</small><b>#${p.rank||'—'}</b></div><div><small>FLPR Rating</small><b>${p.rating?.toFixed?.(2)||'—'}</b></div><div><small>Handicap</small><b>${p.handicap>0?'+':''}${p.handicap??'—'}</b></div></div><button>Open Scorecard →</button></article>`).join('')}</section>
+  <div class="podiumEventMeta card"><span>⌖ ${esc(t.place)}</span><b>${esc(t.name)}</b><span>◷ ${esc(t.date)}</span></div>
 
   <section class="landingDataGrid">
    <div class="card latestRankingCard"><div class="landingPanelHead"><div><span>LATEST TOURNAMENT</span><h2>Player Ranking</h2></div><div class="eventStamp">${esc(t.place)}<b>${esc(t.date)}</b></div></div><div class="tableCard"><table class="dataTable landingTable"><thead><tr><th>Pos.</th><th>Player</th><th>Total Score</th><th>FLPR Rating</th><th>Handicap</th><th>Best Partner</th></tr></thead><tbody>${t.rows.map(tournamentPlayerRow).join('')}</tbody></table></div></div>
