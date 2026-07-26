@@ -152,3 +152,27 @@ a[href^="#"],[data-player],[data-action]{cursor:pointer;touch-action:manipulatio
 .topbar.landingTopbar #mobileMenu{display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;z-index:150!important}
 .tournamentSummary{padding:24px}.eventSummaryHead{display:flex;justify-content:space-between;align-items:center;gap:18px}.eventSummaryHead small{color:var(--gold);font-weight:800;letter-spacing:1px}.eventSummaryHead h2{font-size:30px;margin:6px 0}.eventSummaryHead p{color:var(--muted);margin:0}.summaryStats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:24px 0}.summaryStats div{padding:16px;border:1px solid var(--line);border-radius:8px;background:#071722;text-align:center}.summaryStats small{display:block;color:var(--muted)}.summaryStats strong{display:block;color:var(--gold);font-size:24px;margin-top:6px}.summaryPodium{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.summaryPodium article{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:9px;cursor:pointer}.summaryPodium article>span{font-size:22px;color:var(--gold);font-weight:900}.summaryPodium img{width:58px;height:58px;border-radius:50%;object-fit:cover}.summaryPodium b,.summaryPodium small{display:block}.summaryPodium small{color:var(--muted);margin-top:4px}.scoreboardActions{display:flex;justify-content:flex-end;margin:-4px 0 14px}.fullScoreboard tbody tr{cursor:pointer}
 @media(max-width:800px){.eventSummaryHead{align-items:flex-start;flex-direction:column}.eventSummaryHead .btn{width:100%;text-align:center}.summaryStats,.summaryPodium{grid-template-columns:1fr}.tournamentSummary{padding:16px}.scoreboardActions{justify-content:stretch}.scoreboardActions a{width:100%;text-align:center}}
+
+
+/* FLPR Premium v2.0.5 — Milestone 1.3 compact tournament + persistent shell */
+.topbar.landingTopbar{display:flex!important;visibility:visible!important;opacity:1!important}
+.topbar.landingTopbar #mobileMenu{display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important}
+.tournamentHistory{margin-top:14px}
+@media(max-width:800px){
+  .tournamentSummary{padding:13px!important}
+  .eventSummaryHead{display:block!important}
+  .eventSummaryHead h2{font-size:24px!important;line-height:1.12;margin:5px 0 7px!important}
+  .eventSummaryHead p{font-size:12px!important;line-height:1.4}
+  .summaryStats{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important;margin:14px 0 10px!important}
+  .summaryStats div{padding:11px 4px!important;min-width:0}
+  .summaryStats small{font-size:10px!important;white-space:nowrap}
+  .summaryStats strong{font-size:17px!important;line-height:1.15;overflow-wrap:anywhere}
+  .summaryPodium{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important}
+  .summaryPodium article{display:grid!important;grid-template-columns:1fr!important;justify-items:center;text-align:center;gap:4px!important;padding:9px 3px!important;min-width:0}
+  .summaryPodium article>span{font-size:17px!important}
+  .summaryPodium img{width:48px!important;height:48px!important}
+  .summaryPodium b{font-size:12px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .summaryPodium small{font-size:8px!important;line-height:1.25}
+  .tournamentHistory{margin-top:9px!important}
+  #app:has(.formCard)~*{}
+}
