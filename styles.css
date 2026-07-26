@@ -132,3 +132,27 @@ body.menuOpen{overflow:hidden}
   /* Podium appears immediately below the compact header on phones. */
   main{padding-top:78px !important}
 }
+
+
+/* V1.8.3 interaction reliability fix */
+.topbar.landingTopbar{z-index:100}
+.topbar #topnav{z-index:102}
+body.menuOpen:after{z-index:99}
+.latestEventCard>a,.scoresTitle a,.infoLinks a,.backBtn,.scorecardBtn{position:relative;z-index:2;pointer-events:auto;touch-action:manipulation}
+.showcasePlayer,.scoreLine,.rankRow,.playerTile,[data-nav],#mobileMenu,.drawerClose{touch-action:manipulation}
+
+/* V1.8.4 definitive mobile interaction fix */
+body.menuOpen:after{content:none!important;display:none!important;pointer-events:none!important}
+#app,#globalFooter{position:relative;z-index:1;pointer-events:auto}
+.topbar.landingTopbar{pointer-events:none}
+.topbar.landingTopbar .brand,.topbar.landingTopbar #mobileMenu,.topbar.landingTopbar #topnav{pointer-events:auto}
+[data-route],[data-player],.latestEventCard>a,.scoresTitle a,.backBtn,.scorecardBtn{cursor:pointer!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:rgba(244,191,32,.22)}
+#topnav:not(.open){pointer-events:none!important}
+#topnav.open{pointer-events:auto!important}
+
+/* FLPR Premium v2.0 Stable — native navigation contract */
+a[href^="#"],button,[data-player]{touch-action:manipulation;-webkit-tap-highlight-color:rgba(244,191,32,.22)}
+#topnav.open a{pointer-events:auto!important;position:relative;z-index:104}
+#topnav:not(.open){pointer-events:none!important}
+#topnav:not(.open) a{pointer-events:none!important}
+.latestEventCard>a,.scoresTitle>a,.backBtn,.scorePanelHead>a,.infoLinks>a{pointer-events:auto!important;position:relative;z-index:5}
