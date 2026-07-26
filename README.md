@@ -1,14 +1,7 @@
-# FLPR Premium — Final Production Candidate
+# FLPR Premium Final Production Candidate 2
 
-Flat Netlify deployment package. No npm, framework, or build step required.
+Flat Netlify package. No build step.
 
-Highlights:
-- Stable hash router and mobile navigation
-- Podium stage 1–2–3
-- Ranking and full scoreboard
-- Player Scorecards directory (no forced default player)
-- Expanded player analytics: radar, statistical bars, rating/momentum profile, partner and opponent matrix, development analysis
-- Official player photos included for Nicholas, David, Hansen, Donny, Ricky, Reza, and Kennard
-- Workbook-connected JSON dataset
+Added: Hall of Fame, complete statistics leaderboards, consistency and momentum in ranking, Tournament Center statistics and champion history, and expanded Player Scorecards with radar, rating/ranking/handicap profiles, intelligence, achievements, partner/opponent matrix, and coaching outlook.
 
-Deploy the contents of this ZIP directly to the repository root or Netlify drag-and-drop.
+Important: the official Sandy photo is not present in the supplied file set, so a neutral placeholder is retained rather than assigning the wrong person.
