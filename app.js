@@ -9,19 +9,14 @@ const mobileMenu=document.getElementById('mobileMenu');
 const $=s=>document.querySelector(s); const photo=p=>PHOTOS[p.slug]||'generic-padel-avatar.svg'; const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function navigateTo(routeName){
  const target=String(routeName||'dashboard').replace(/^#/,'');
- const nextHash='#'+target;
- if(location.hash===nextHash){
-  route(target);
-  window.scrollTo(0,0);
-  return;
- }
- location.hash=target;
+ if(location.hash==='#'+target){ route(); }
+ else { location.hash=target; }
 }
-
 window.navigateTo=navigateTo;
 function menus(){
  topnav.innerHTML=`<div class="drawerHead"><strong>FLPR MENU</strong><button class="drawerClose" type="button" aria-label="Close navigation menu">×</button></div>${ROUTES.map(([k,v])=>`<a href="#${k}" data-nav="${k}"><span>${ICONS[k]}</span>${v}</a>`).join('')}`;
  sidebar.innerHTML='';
+ topnav.setAttribute('aria-hidden','true');
  const setMenu=open=>{
   topnav.classList.toggle('open',open);
   document.body.classList.toggle('menuOpen',open);
@@ -29,21 +24,24 @@ function menus(){
   topnav.setAttribute('aria-hidden',String(!open));
  };
  window.setFLPRMenu=setMenu;
- setMenu(false);
- mobileMenu.onclick=e=>{e.stopPropagation();setMenu(!topnav.classList.contains('open'))};
- topnav.querySelector('.drawerClose').onclick=e=>{e.stopPropagation();setMenu(false)};
+ mobileMenu.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();setMenu(!topnav.classList.contains('open'))});
+ topnav.querySelector('.drawerClose').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();setMenu(false)});
  topnav.addEventListener('click',e=>{
-  if(e.target.closest('a[href^="#"]')) setMenu(false);
+  const link=e.target.closest('a[data-nav]');
+  if(!link)return;
+  e.preventDefault();
+  e.stopPropagation();
+  const destination=link.dataset.nav;
+  setMenu(false);
+  navigateTo(destination);
  });
- document.addEventListener('click',e=>{
-  if(topnav.classList.contains('open')&&!topnav.contains(e.target)&&!mobileMenu.contains(e.target)) setMenu(false);
- });
+ document.addEventListener('click',e=>{if(topnav.classList.contains('open')&&!topnav.contains(e.target)&&!mobileMenu.contains(e.target))setMenu(false)});
  document.addEventListener('keydown',e=>{if(e.key==='Escape')setMenu(false)});
 }
 
 function active(k){document.querySelectorAll('[data-nav]').forEach(x=>x.classList.toggle('active',x.dataset.nav===k));topnav.classList.remove('open');document.body.classList.remove('menuOpen');mobileMenu.setAttribute('aria-expanded','false');topnav.setAttribute('aria-hidden','true')}
 function profile(){return D.players.find(p=>p.slug==='edy-sp')||D.players[0]}
-function rankRows(n=8){return D.players.slice(0,n).map(p=>`<div class="rankRow" data-player="${p.slug}"><span class="rankNo">${p.rank}</span><img class="avatar" src="${photo(p)}"><div><div class="rankName">${esc(p.name)}</div><div class="rankMeta">FLPR ${p.rating.toFixed(2)}</div></div><div class="hcp">HCP<b>${p.handicap>0?'+':''}${p.handicap}</b></div></div>`).join('')}
+function rankRows(n=8){return D.players.slice(0,n).map(p=>`<div class="rankRow" onclick="openPlayer('${p.slug}')"><span class="rankNo">${p.rank}</span><img class="avatar" src="${photo(p)}"><div><div class="rankName">${esc(p.name)}</div><div class="rankMeta">FLPR ${p.rating.toFixed(2)}</div></div><div class="hcp">HCP<b>${p.handicap>0?'+':''}${p.handicap}</b></div></div>`).join('')}
 function svgChart(p){let vals=[Math.max(20,p.rating-8),Math.max(20,p.rating-5),Math.max(20,p.rating-3),Math.max(20,p.rating-1),p.rating],min=Math.min(...vals)-3,max=Math.max(...vals)+3;let pts=vals.map((v,i)=>[50+i*105,220-(v-min)/(max-min)*150]);let line=pts.map(x=>x.join(',')).join(' '), area=`50,220 ${line} 470,220`;return `<svg viewBox="0 0 520 250" class="svgChart"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4bf20" stop-opacity=".45"/><stop offset="1" stop-color="#f4bf20" stop-opacity="0"/></linearGradient></defs>${[40,85,130,175,220].map(y=>`<line x1="45" y1="${y}" x2="485" y2="${y}" class="axis"/>`).join('')}<polygon points="${area}" class="chartArea"/><polyline points="${line}" class="chartLine"/>${pts.map((x,i)=>`<circle cx="${x[0]}" cy="${x[1]}" r="6" class="chartDot"/><text x="${x[0]}" y="${x[1]-13}" fill="#dfe8ef" text-anchor="middle" font-size="12">${vals[i].toFixed(1)}</text><text x="${x[0]}" y="242" fill="#92a2b1" text-anchor="middle" font-size="11">T${i+1}</text>`).join('')}</svg>`}
 
 function score(v){return Math.max(0,Math.min(100,Number(v)||0))}
@@ -75,12 +73,12 @@ function latestTournamentData(){
  ].map((r,i)=>{const p=D.players.find(x=>x.name.toLowerCase()===r.name.toLowerCase())||{};return {...p,...r,eventRank:i+1}});
  return {name:'JakSel T5 — Weekly Americano',place:'Jakarta Selatan',date:'20 July 2026',format:'Americano · 2 Courts',rows};
 }
-function tournamentPlayerRow(p){return `<tr data-player="${p.slug||''}"><td><span class="eventRank ${p.eventRank<=3?'podium':''}">${p.eventRank}</span></td><td><div class="landingPlayer"><img src="${photo(p)}"><div><b>${esc(p.name)}</b><small>${p.status||'Player'} · FLPR #${p.rank||'—'}</small></div></div></td><td class="scoreCell">${p.score}</td><td>${p.rating!=null?p.rating.toFixed(2):'—'}</td><td><span class="landingHcp">${p.handicap>0?'+':''}${p.handicap??'—'}</span></td><td>${esc(p.bestPartner)}</td></tr>`}
+function tournamentPlayerRow(p){return `<tr onclick="openPlayer('${p.slug||''}')"><td><span class="eventRank ${p.eventRank<=3?'podium':''}">${p.eventRank}</span></td><td><div class="landingPlayer"><img src="${photo(p)}"><div><b>${esc(p.name)}</b><small>${p.status||'Player'} · FLPR #${p.rank||'—'}</small></div></div></td><td class="scoreCell">${p.score}</td><td>${p.rating!=null?p.rating.toFixed(2):'—'}</td><td><span class="landingHcp">${p.handicap>0?'+':''}${p.handicap??'—'}</span></td><td>${esc(p.bestPartner)}</td></tr>`}
 function dashboard(){
  active('dashboard');
  const t=latestTournamentData(), podium=t.rows.slice(0,3);
  const totalPoints=t.rows.reduce((a,b)=>a+b.score,0);
- const podiumCard=(p,place)=>`<article class="showcasePlayer place${place}" data-player="${p.slug||''}">
+ const podiumCard=(p,place)=>`<article class="showcasePlayer place${place}" onclick="openPlayer('${p.slug||''}')">
    <div class="medalBadge">${place}</div>
    <div class="showcasePhoto"><img src="${photo(p)}" alt="${esc(p.name)}"></div>
    <div class="playerNameBand">${esc(p.name)}</div>
@@ -92,12 +90,12 @@ function dashboard(){
   <section class="showcaseHeading"><h2>❧ &nbsp; LATEST TOURNAMENT WINNERS &nbsp; ❧</h2><p>Top 3 Champions</p></section>
   <section class="showcasePodium">${podiumCard(podium[1]||podium[0],2)}${podiumCard(podium[0],1)}${podiumCard(podium[2]||podium[0],3)}</section>
   <section class="latestEventCard card"><div class="eventPoster"><div class="posterGlow">AMERICANO<br><b>PADEL</b></div></div><div class="eventDetails"><span>LATEST TOURNAMENT</span><h2>${esc(t.name)}</h2><div><b>⌖ ${esc(t.place)}</b><b>▣ ${esc(t.date)}</b><b>▦ ${esc(t.format)}</b></div></div><a href="#tournaments">View Tournament →</a></section>
-  <section class="latestScores"><div class="scoresTitle"><h2>▥ &nbsp; TOP SCORES – LATEST TOURNAMENT</h2><a href="#tournaments">View Full Scoreboard →</a></div><div class="scoresList">${t.rows.slice(0,5).map(p=>`<div class="scoreLine" data-player="${p.slug||''}"><span class="scorePosition p${p.eventRank}">${p.eventRank}</span><img src="${photo(p)}"><b>${esc(p.name)}</b><strong>${p.score}<small>Points</small></strong></div>`).join('')}</div></section>
+  <section class="latestScores"><div class="scoresTitle"><h2>▥ &nbsp; TOP SCORES – LATEST TOURNAMENT</h2><a href="#tournaments">View Full Scoreboard →</a></div><div class="scoresList">${t.rows.slice(0,5).map(p=>`<div class="scoreLine" onclick="openPlayer('${p.slug||''}')"><span class="scorePosition p${p.eventRank}">${p.eventRank}</span><img src="${photo(p)}"><b>${esc(p.name)}</b><strong>${p.score}<small>Points</small></strong></div>`).join('')}</div></section>
   <section class="landingKpis"><div><small>TOTAL PLAYERS</small><strong>♙ ${D.players.length}</strong><span>Active Players</span></div><div><small>TOTAL TOURNAMENTS</small><strong>🏆 5</strong><span>Completed</span></div><div><small>TOTAL POINTS</small><strong>◉ ${totalPoints}</strong><span>Latest Event</span></div><div><small>PLAYERS / TOURNAMENT</small><strong>♙ ${t.rows.length}</strong><span>Players</span></div><div><small>LATEST UPDATE</small><strong>◷ ${esc(t.date)}</strong><span>${esc(t.place)}</span></div></section>
  </div>`;
 }
-function ranking(){active('ranking');app.innerHTML=head('Live Ranking','Official FLPR ratings generated from the master workbook.')+`<div class="card tableCard"><table class="dataTable"><thead><tr><th>Rank</th><th>Player</th><th>Rating</th><th>Tier</th><th>Matches</th><th>Wins</th><th>Win Rate</th><th>HCP</th><th>Status</th></tr></thead><tbody>${D.players.map(p=>`<tr data-player="${p.slug}"><td>#${p.rank}</td><td><img class="avatar" src="${photo(p)}" style="vertical-align:middle;margin-right:9px">${esc(p.name)}</td><td><b style="color:#f4c52d">${p.rating.toFixed(2)}</b></td><td>${p.tier}</td><td>${p.matches}</td><td>${p.wins}</td><td>${p.winRate}%</td><td>${p.handicap>0?'+':''}${p.handicap}</td><td>${p.status}</td></tr>`).join('')}</tbody></table></div>`}
-function players(){active('players');app.innerHTML=head('Players','Individual profiles, performance metrics, and reports.')+`<div class="grid playerGrid">${D.players.map(p=>`<article class="card playerTile" role="link" tabindex="0" data-player="${p.slug}"><img src="${photo(p)}"><h3>#${p.rank} ${esc(p.name)}</h3><strong style="color:#f4c52d">FLPR ${p.rating.toFixed(2)}</strong><p>${p.matches} matches · ${p.winRate}% win rate · HCP ${p.handicap>0?'+':''}${p.handicap}</p><button class="scorecardBtn" data-player="${p.slug}">View Player Scorecard →</button></article>`).join('')}</div>`}
+function ranking(){active('ranking');app.innerHTML=head('Live Ranking','Official FLPR ratings generated from the master workbook.')+`<div class="card tableCard"><table class="dataTable"><thead><tr><th>Rank</th><th>Player</th><th>Rating</th><th>Tier</th><th>Matches</th><th>Wins</th><th>Win Rate</th><th>HCP</th><th>Status</th></tr></thead><tbody>${D.players.map(p=>`<tr onclick="openPlayer('${p.slug}')"><td>#${p.rank}</td><td><img class="avatar" src="${photo(p)}" style="vertical-align:middle;margin-right:9px">${esc(p.name)}</td><td><b style="color:#f4c52d">${p.rating.toFixed(2)}</b></td><td>${p.tier}</td><td>${p.matches}</td><td>${p.wins}</td><td>${p.winRate}%</td><td>${p.handicap>0?'+':''}${p.handicap}</td><td>${p.status}</td></tr>`).join('')}</tbody></table></div>`}
+function players(){active('players');app.innerHTML=head('Players','Individual profiles, performance metrics, and reports.')+`<div class="grid playerGrid">${D.players.map(p=>`<article class="card playerTile" role="link" tabindex="0" onclick="openPlayer('${p.slug}')" onkeydown="if(event.key==='Enter'||event.key===' '){openPlayer('${p.slug}')}"><img src="${photo(p)}"><h3>#${p.rank} ${esc(p.name)}</h3><strong style="color:#f4c52d">FLPR ${p.rating.toFixed(2)}</strong><p>${p.matches} matches · ${p.winRate}% win rate · HCP ${p.handicap>0?'+':''}${p.handicap}</p><button class="scorecardBtn" onclick="event.stopPropagation();openPlayer('${p.slug}')">View Player Scorecard →</button></article>`).join('')}</div>`}
 function statistics(){active('statistics');let avg=D.kpis['Average Rating'];app.innerHTML=head('Statistics','League-wide performance intelligence.')+`<div class="grid metricsGrid">${[['Average Rating',avg.toFixed(2)],['Rating Spread',D.kpis['Rating Spread'].toFixed(1)],['Established Players',D.kpis['Established Players']],['Average Matches',D.kpis['Average Matches / Player'].toFixed(1)]].map(x=>`<div class="card metricBox"><small>${x[0]}</small><strong>${x[1]}</strong></div>`).join('')}</div><div class="card chartCard" style="margin-top:14px"><h3>TOP 10 RATING DISTRIBUTION</h3><svg viewBox="0 0 900 360" style="width:100%;height:360px">${D.players.slice(0,10).map((p,i)=>{let h=p.rating*4,x=45+i*82;return `<rect x="${x}" y="${310-h}" width="52" height="${h}" fill="#e8b91f" rx="5"/><text x="${x+26}" y="${300-h}" text-anchor="middle" fill="white" font-size="12">${p.rating.toFixed(1)}</text><text x="${x+26}" y="335" text-anchor="middle" fill="#9aabba" font-size="11">${esc(p.name.split(' ')[0])}</text>`}).join('')}</svg></div>`}
 function tournaments(){active('tournaments');app.innerHTML=head('Tournaments','Competition history and upcoming events.')+`<div class="card tableCard"><table class="dataTable"><thead><tr><th>Event</th><th>Date</th><th>Format</th><th>Matches</th><th>Status</th></tr></thead><tbody>${['T1 · 15 Jun 2026','T2 · 22 Jun 2026','T3 · 29 Jun 2026','T4 · 06 Jul 2026','T5 · 20 Jul 2026'].map((x,i)=>`<tr><td>JakSel ${x}</td><td>${x.split('·')[1]}</td><td>Americano</td><td>${[12,12,11,11,11][i]}</td><td><span class="pill">Completed</span></td></tr>`).join('')}</tbody></table></div>`}
 function handicap(){active('handicap');app.innerHTML=head('Handicap Engine','Balanced competition while preserving true player strength.')+`<div class="card tableCard"><table class="dataTable"><thead><tr><th>Player</th><th>Rating</th><th>Class</th><th>Official HCP</th><th>Confidence</th></tr></thead><tbody>${D.players.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.rating.toFixed(2)}</td><td>${p.class}</td><td><b>${p.handicap>0?'+':''}${p.handicap}</b></td><td>${p.status}</td></tr>`).join('')}</tbody></table></div>`}
@@ -131,24 +129,16 @@ function playerPage(slug){
   <div class="card scorePanel"><div class="scorePanelHead"><h3>DATA STATUS</h3></div><div class="dataStatus"><span>✓</span><div><b>Workbook-connected scorecard</b><p>Ranking, handicap, performance metrics, partner chemistry, and opponent difficulty are generated from ${esc(D.meta.sourceWorkbook)}.</p></div></div><div class="dataStatus pending"><span>◷</span><div><b>Tournament timeline expansion</b><p>Detailed per-tournament results and match history will populate after the raw Americano import feed is enabled.</p></div></div></div>
  </section></div>`;
 }
-function openPlayer(slug){ if(!slug)return; navigateTo('player/'+slug); }
+function openPlayer(slug){ location.hash='player/'+slug; }
 window.openPlayer=openPlayer;
-function route(explicitRoute){let h=explicitRoute||location.hash.slice(1)||'dashboard';if(h.startsWith('player/'))return playerPage(h.split('/')[1]);({dashboard,ranking,players,statistics,tournaments,handicap,partners,awards,hall,import:importPage,settings,about}[h]||dashboard)()}
+function route(){let h=location.hash.slice(1)||'dashboard';if(h.startsWith('player/'))return playerPage(h.split('/')[1]);({dashboard,ranking,players,statistics,tournaments,handicap,partners,awards,hall,import:importPage,settings,about}[h]||dashboard)()}
 
 document.addEventListener('click',e=>{
- const playerTarget=e.target.closest('[data-player]');
- if(!playerTarget)return;
- const slug=playerTarget.dataset.player;
- if(!slug)return;
+ const link=e.target.closest('a[href^="#"]');
+ if(!link || link.dataset.nav)return;
+ const destination=link.getAttribute('href').slice(1);
+ if(!destination)return;
  e.preventDefault();
- openPlayer(slug);
+ navigateTo(destination);
 });
-
-document.addEventListener('keydown',e=>{
- if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-player]')){
-  e.preventDefault();openPlayer(e.target.dataset.player);
- }
-});
-addEventListener('hashchange',()=>{if(D)route()});
-addEventListener('popstate',()=>{if(D)route()});
-fetch('flpr-data.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(d=>{D=d;menus();route()}).catch(e=>app.innerHTML=`<div class="card formCard"><h1>FLPR data could not load</h1><p>${esc(e.message)}</p></div>`);
+fetch('flpr-data.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(d=>{D=d;menus();route();addEventListener('hashchange',route)}).catch(e=>app.innerHTML=`<div class="card formCard"><h1>FLPR data could not load</h1><p>${esc(e.message)}</p></div>`);
