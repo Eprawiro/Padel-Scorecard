@@ -1,12 +1,13 @@
-# FLPR Premium v2.0.2 — Milestone 1 Complete
+# FLPR Premium v2.0.3 — Milestone 1.1
 
-Flat, no-build Netlify package. Upload every file in this directory to the repository root.
+Flat, no-build deployment package for GitHub → Netlify.
 
-Milestone 1 fixes:
-- Restored the shared page header renderer used by Tournament, Ranking, Players, Statistics, Handicap, Partners, Awards, Hall of Fame, Import, Settings and About.
-- Native hash navigation for Android Chrome and Samsung Internet.
-- Single hash router and single delegated interaction controller.
-- Working hamburger drawer, browser Back/Forward and refresh.
-- Landing page layout retained.
+## Milestone 1.1 fix
+- Corrected drawer/backdrop stacking order.
+- Hamburger drawer remains above the backdrop on mobile browsers.
+- Drawer links and close button receive touch/click events.
+- Backdrop remains below the drawer and closes it when tapped outside.
+- Native hash routing, browser Back/Forward, and refresh support remain enabled.
 
-Source database: FLPR_Master_Workbook_v2.6_PhaseC_Complete.xlsx
+## Deploy
+Replace all files in the repository root and commit. Netlify requires no build command.

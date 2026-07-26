@@ -132,10 +132,17 @@ body.menuOpen:after{content:none!important;display:none!important;pointer-events
   transition:transform .25s ease,opacity .18s ease;
 }
 .topbar #topnav.open a,.topbar #topnav.open button{pointer-events:auto!important;touch-action:manipulation}
-#menuBackdrop{position:fixed;inset:0;z-index:105;border:0;margin:0;padding:0;background:rgba(0,0,0,.68);cursor:pointer;touch-action:manipulation}
+#menuBackdrop{position:fixed;inset:0;z-index:90;border:0;margin:0;padding:0;background:rgba(0,0,0,.68);cursor:pointer;touch-action:manipulation}
 #menuBackdrop[hidden]{display:none!important}
 #menuBackdrop.open{display:block}
 #app,#globalFooter{position:relative;z-index:1;pointer-events:auto}
 a[href^="#"],[data-player],[data-action]{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(244,191,32,.22)}
 .latestEventCard>a,.scoresTitle>a,.backBtn,.scorePanelHead>a,.infoLinks>a{position:relative;z-index:2;pointer-events:auto}
 @media(max-width:800px){main{padding-top:78px!important}}
+
+/* FLPR Premium v2.0.3 — Milestone 1.1 drawer stacking fix */
+.topbar.landingTopbar{z-index:120!important}
+.topbar #topnav{z-index:130!important}
+#menuBackdrop{z-index:110!important}
+.topbar #topnav.open{pointer-events:auto!important}
+.topbar #topnav.open *{pointer-events:auto!important}
