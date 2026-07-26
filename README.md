@@ -10,3 +10,9 @@ Flat, no-build static application for GitHub → Netlify deployment.
 - Clean 3.0 router/data foundation retained
 
 Replace all files in the repository root. Netlify publish directory should remain `.`.
+
+
+RC3 changes:
+- Removed All Players navigation.
+- Player Scorecards now opens a searchable player directory.
+- Detailed scorecards restored with performance, intelligence, development, partner/opponent, rating drivers, and data status panels.
