@@ -318,11 +318,24 @@ function wirePage(name){
       autoButton.disabled=true;autoButton.textContent='Fetching…';
       out.innerHTML='<div class="import-loading"><span class="spinner"></span><div><strong>Reading Americano result page</strong><p>Fetching the official page and validating standings, rounds, players, and duplicate identity.</p></div></div>';
       try{
-        const res=await fetch('/.netlify/functions/americano-preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url,knownPlayers:DATA.players.map(p=>({name:p.name,slug:p.slug})),aliases:playerAliases()})});
-        const body=await res.json().catch(()=>({ok:false,error:`Preview service returned HTTP ${res.status}.`}));
-        if(!res.ok||!body.ok){const detail=body.preview?renderAutoPreview(body.preview):'';out.innerHTML=`<div class="error"><strong>Preview failed.</strong> ${escapeHtml(body.error||'The page could not be parsed.')}</div>${detail}`;return;}
+        const requestBody=JSON.stringify({url,knownPlayers:DATA.players.map(p=>({name:p.name,slug:p.slug})),aliases:playerAliases()});
+        const apiBase=String(window.FLPR_CONFIG?.importApiBase||'').replace(/\/$/,'');
+        if(!apiBase){
+          out.innerHTML='<div class="error"><strong>Import service is not configured.</strong><br>Deploy <code>americano-worker.js</code> as a Cloudflare Worker, then paste its HTTPS URL into <code>flpr-config.js</code>.</div>';
+          return;
+        }
+        let res;
+        try{
+          res=await fetch(`${apiBase}/preview`,{method:'POST',headers:{'content-type':'application/json'},body:requestBody});
+        }catch(error){
+          out.innerHTML=`<div class="error"><strong>Import service unreachable.</strong> ${escapeHtml(error?.message||'Network request failed.')}<br><small>Verify <code>${escapeHtml(apiBase)}/health</code>.</small></div>`;
+          return;
+        }
+        const contentType=res.headers.get('content-type')||'';
+        const body=contentType.includes('application/json')?await res.json():{ok:false,error:`Preview service returned HTTP ${res.status} with a non-JSON response.`};
+        if(!res.ok||!body.ok){const detail=body.preview?renderAutoPreview(body.preview):'';out.innerHTML=`<div class="error"><strong>Preview failed.</strong> ${escapeHtml(body.error||`Preview service returned HTTP ${res.status}.`)}</div>${detail}`;return;}
         out.innerHTML=renderAutoPreview(body.preview);
-      }catch(err){out.innerHTML=`<div class="error"><strong>Preview service unavailable.</strong> ${escapeHtml(err.message)}<br><small>Confirm the site is deployed through Netlify so the server function is available.</small></div>`;}
+      }catch(err){out.innerHTML=`<div class="error"><strong>Preview service unavailable.</strong> ${escapeHtml(err.message)}<br><small>Check the Worker URL in flpr-config.js and confirm the Worker health endpoint is ready.</small></div>`;}
       finally{autoButton.disabled=false;autoButton.textContent='Fetch & Preview';}
     });
     const preview=()=>{const standings=parseStandings(document.getElementById('rawResult')?.value.trim()||'');const out=document.getElementById('importResult');if(standings.length<3){out.innerHTML='<div class="notice">Please paste at least three valid standings lines, for example: 1. Player Name 23</div>';return null;}out.innerHTML=`<div class="notice"><strong>Manual preview ready:</strong> ${standings.length} players detected.</div><div class="table-wrap"><table class="table"><thead><tr><th>Rank</th><th>Player</th><th>Points</th></tr></thead><tbody>${standings.map(x=>`<tr><td>${x.rank}</td><td>${escapeHtml(x.name)}</td><td>${x.points}</td></tr>`).join('')}</tbody></table></div>`;return standings;};
