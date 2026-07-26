@@ -176,3 +176,27 @@ a[href^="#"],[data-player],[data-action]{cursor:pointer;touch-action:manipulatio
   .tournamentHistory{margin-top:9px!important}
   #app:has(.formCard)~*{}
 }
+
+
+/* v2.0.6 Milestone 1.4 — persistent shell and standardized tournament archive */
+#shell>.topbar{
+ position:fixed!important;top:0!important;left:0!important;right:0!important;
+ display:flex!important;visibility:visible!important;opacity:1!important;
+ z-index:1000!important;pointer-events:none!important;
+}
+#shell>.topbar .brand,#shell>.topbar #mobileMenu,#shell>.topbar #topnav{pointer-events:auto!important}
+#shell>.topbar #mobileMenu{display:block!important;visibility:visible!important;opacity:1!important}
+body.importRoute #shell>.topbar,body.importRoute #mobileMenu{display:flex!important;visibility:visible!important;opacity:1!important}
+body.importRoute #mobileMenu{display:block!important}
+.tournamentArchive{display:grid;gap:16px}
+.tournamentArchiveCard{margin:0}
+.tournamentPendingNote{margin:12px 0 0;padding:10px 12px;border:1px dashed #31526a;border-radius:8px;color:#91a5b4;font-size:12px;line-height:1.5;text-align:center}
+.pendingPodium{opacity:.76}
+.pendingPodium img{filter:grayscale(.35)}
+@media(max-width:800px){
+ .tournamentArchive{gap:10px}
+ .tournamentArchiveCard{padding:12px!important}
+ .tournamentArchiveCard .eventSummaryHead h2{font-size:21px!important}
+ .tournamentArchiveCard .eventSummaryHead p{font-size:10px!important}
+ .tournamentPendingNote{font-size:9px;margin-top:8px;padding:8px}
+}

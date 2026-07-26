@@ -96,6 +96,28 @@ function latestTournamentData(){
  ].map((r,i)=>{const p=D.players.find(x=>x.name.toLowerCase()===r.name.toLowerCase())||{};return {...p,...r,eventRank:i+1}});
  return {name:'JakSel T5 — Weekly Americano',place:'Jakarta Selatan',date:'20 July 2026',format:'Americano · 2 Courts',rows};
 }
+
+function allTournamentData(){
+ const latest=latestTournamentData();
+ const historical=[
+  {id:'T4',name:'JakSel T4 — Weekly Americano',place:'Jakarta Selatan',date:'06 July 2026',format:'Americano',matches:11,players:null,totalPoints:null,rows:[]},
+  {id:'T3',name:'JakSel T3 — Weekly Americano',place:'Jakarta Selatan',date:'29 June 2026',format:'Americano',matches:11,players:null,totalPoints:null,rows:[]},
+  {id:'T2',name:'JakSel T2 — Weekly Americano',place:'Jakarta Selatan',date:'22 June 2026',format:'Americano',matches:12,players:null,totalPoints:null,rows:[]},
+  {id:'T1',name:'JakSel T1 — Weekly Americano',place:'Jakarta Selatan',date:'15 June 2026',format:'Americano · 2 Courts',matches:12,players:9,totalPoints:null,rows:[]}
+ ];
+ return [{id:'T5',...latest,matches:11,players:latest.rows.length,totalPoints:latest.rows.reduce((sum,row)=>sum+row.score,0)},...historical];
+}
+function tournamentSummaryCard(t,index){
+ const podium=(t.rows||[]).slice(0,3);
+ const hasDetail=podium.length===3;
+ const placeholder=[1,2,3].map(place=>`<article class="pendingPodium"><span>#${place}</span><img src="generic-padel-avatar.svg" alt="Pending player"><div><b>Detailed result pending</b><small>Awaiting tournament import</small></div></article>`).join('');
+ return `<section class="card tournamentSummary tournamentArchiveCard">
+   <div class="eventSummaryHead"><div><small>${index===0?'LATEST TOURNAMENT':'COMPLETED TOURNAMENT'}</small><h2>${esc(t.name)}</h2><p>${esc(t.place)} · ${esc(t.date)} · ${esc(t.format)}${t.matches?` · ${t.matches} Matches`:''}</p></div></div>
+   <div class="summaryStats"><div><small>Players</small><strong>${t.players??'—'}</strong></div><div><small>Total Points</small><strong>${t.totalPoints??'—'}</strong></div><div><small>Champion</small><strong>${hasDetail?esc(podium[0].name):'Pending'}</strong></div></div>
+   <div class="summaryPodium">${hasDetail?podium.map((player,i)=>`<article data-player="${player.slug||''}"><span>#${i+1}</span><img src="${photo(player)}" alt="${esc(player.name)}"><div><b>${esc(player.name)}</b><small>${player.score} pts · FLPR #${player.rank||'—'}</small></div></article>`).join(''):placeholder}</div>
+   ${hasDetail?'':`<p class="tournamentPendingNote">Detailed podium, player count, and point totals will populate automatically after this tournament is added to the structured import dataset.</p>`}
+  </section>`;
+}
 function tournamentPlayerRow(p){return `<tr data-player="${p.slug||''}"><td><span class="eventRank ${p.eventRank<=3?'podium':''}">${p.eventRank}</span></td><td><div class="landingPlayer"><img src="${photo(p)}"><div><b>${esc(p.name)}</b><small>${p.status||'Player'} · FLPR #${p.rank||'—'}</small></div></div></td><td class="scoreCell">${p.score}</td><td>${p.rating!=null?p.rating.toFixed(2):'—'}</td><td><span class="landingHcp">${p.handicap>0?'+':''}${p.handicap??'—'}</span></td><td>${esc(p.bestPartner)}</td></tr>`}
 function dashboard(){
  active('dashboard');
@@ -125,8 +147,8 @@ function players(){active('players');app.innerHTML=head('Players','Individual pr
 function statistics(){active('statistics');let avg=D.kpis['Average Rating'];app.innerHTML=head('Statistics','League-wide performance intelligence.')+`<div class="grid metricsGrid">${[['Average Rating',avg.toFixed(2)],['Rating Spread',D.kpis['Rating Spread'].toFixed(1)],['Established Players',D.kpis['Established Players']],['Average Matches',D.kpis['Average Matches / Player'].toFixed(1)]].map(x=>`<div class="card metricBox"><small>${x[0]}</small><strong>${x[1]}</strong></div>`).join('')}</div><div class="card chartCard" style="margin-top:14px"><h3>TOP 10 RATING DISTRIBUTION</h3><svg viewBox="0 0 900 360" style="width:100%;height:360px">${D.players.slice(0,10).map((p,i)=>{let h=p.rating*4,x=45+i*82;return `<rect x="${x}" y="${310-h}" width="52" height="${h}" fill="#e8b91f" rx="5"/><text x="${x+26}" y="${300-h}" text-anchor="middle" fill="white" font-size="12">${p.rating.toFixed(1)}</text><text x="${x+26}" y="335" text-anchor="middle" fill="#9aabba" font-size="11">${esc(p.name.split(' ')[0])}</text>`}).join('')}</svg></div>`}
 function tournaments(){
  active('tournaments');
- const t=latestTournamentData(), podium=t.rows.slice(0,3), totalPoints=t.rows.reduce((sum,row)=>sum+row.score,0);
- app.innerHTML=head('Tournament Summary','Latest event overview, podium, and competition history.')+`<section class="card tournamentSummary"><div class="eventSummaryHead"><div><small>LATEST TOURNAMENT</small><h2>${esc(t.name)}</h2><p>${esc(t.place)} · ${esc(t.date)} · ${esc(t.format)}</p></div></div><div class="summaryStats"><div><small>Players</small><strong>${t.rows.length}</strong></div><div><small>Total Points</small><strong>${totalPoints}</strong></div><div><small>Champion</small><strong>${esc(podium[0]?.name||'—')}</strong></div></div><div class="summaryPodium">${podium.map((p,i)=>`<article data-player="${p.slug||''}"><span>#${i+1}</span><img src="${photo(p)}" alt="${esc(p.name)}"><div><b>${esc(p.name)}</b><small>${p.score} pts · FLPR #${p.rank||'—'}</small></div></article>`).join('')}</div></section><div class="card tableCard tournamentHistory"><table class="dataTable"><thead><tr><th>Event</th><th>Date</th><th>Format</th><th>Matches</th><th>Status</th></tr></thead><tbody>${['T1 · 15 Jun 2026','T2 · 22 Jun 2026','T3 · 29 Jun 2026','T4 · 06 Jul 2026','T5 · 20 Jul 2026'].map((x,i)=>`<tr><td>JakSel ${x}</td><td>${x.split('·')[1]}</td><td>Americano</td><td>${[12,12,11,11,11][i]}</td><td><span class="pill">Completed</span></td></tr>`).join('')}</tbody></table></div>`;
+ const tournaments=allTournamentData();
+ app.innerHTML=head('Tournament Summary','All completed tournaments shown in one consistent summary format.')+`<div class="tournamentArchive">${tournaments.map(tournamentSummaryCard).join('')}</div>`;
 }
 function scoreboard(){
  active('scoreboard');
@@ -137,7 +159,7 @@ function handicap(){active('handicap');app.innerHTML=head('Handicap Engine','Bal
 function partners(){active('partners');app.innerHTML=head('Partner Matrix','Best combinations and difficult matchups.')+`<div class="grid playerGrid">${D.players.map(p=>`<div class="card playerTile"><img src="${photo(p)}"><h3>${esc(p.name)}</h3><p>Best partner</p><strong>${esc(p.analysis.bestPartner?.name||'Insufficient data')}</strong><p>${p.analysis.bestPartner?`${p.analysis.bestPartner.winRate}% win rate · ${p.analysis.bestPartner.matches} matches`:''}</p></div>`).join('')}</div>`}
 function awards(){active('awards');app.innerHTML=head('Awards','Official FLPR season recognition.')+`<div class="grid playerGrid">${D.awards.map((a,i)=>`<div class="card playerTile"><div style="font-size:44px">${['🏆','⭐','🥇','🔥','🎯','🤝','📈','🧱','⚡','♛','🏅'][i]||'🏅'}</div><h3>${esc(a.award)}</h3><strong style="color:#f4c52d">${esc(a.winner)}</strong><p>${esc(a.metric)} · ${esc(a.rule)}</p><p>Runner-up: ${esc(a.runnerUp)}</p></div>`).join('')}</div>`}
 function hall(){active('hall');app.innerHTML=head('Hall of Fame','Players and performances defining the FLPR legacy.')+`<div class="card profileCard" style="text-align:center"><div style="font-size:75px">♛</div><small>Current FLPR Champion</small><h1 style="font-size:48px;margin:10px">${esc(D.players[0].name)}</h1><img class="heroPhoto" style="height:230px" src="${photo(D.players[0])}"><div class="bigRating">${D.players[0].rating.toFixed(2)}</div><p>${D.players[0].wins} wins from ${D.players[0].matches} matches</p></div>`}
-function importPage(){active('import');app.innerHTML=head('Data Import','Workbook-driven update center for Netlify and GitHub.')+`<div class="card formCard"><h2>FLPR Master Workbook</h2><p class="note">This production package is generated from <b>FLPR_Master_Workbook_v2.6_PhaseC_Complete.xlsx</b>. For automatic GitHub–Netlify deployment, replace the workbook and regenerate <b>flpr-data.json</b> before committing.</p><label>Americano Padel result URL</label><input placeholder="https://americano-padel.com/r/..."><button class="btn" type="button" data-action="validate-import">Validate URL</button></div>`}
+function importPage(){active('import');ensureAppShell();document.body.classList.add('importRoute');app.innerHTML=head('Data Import','Workbook-driven update center for Netlify and GitHub.')+`<div class="card formCard"><h2>FLPR Master Workbook</h2><p class="note">This production package is generated from <b>FLPR_Master_Workbook_v2.6_PhaseC_Complete.xlsx</b>. For automatic GitHub–Netlify deployment, replace the workbook and regenerate <b>flpr-data.json</b> before committing.</p><label>Americano Padel result URL</label><input placeholder="https://americano-padel.com/r/..."><button class="btn" type="button" data-action="validate-import">Validate URL</button></div>`}
 function settings(){active('settings');app.innerHTML=head('Settings','Display and system preferences.')+`<div class="card formCard"><label>Default player profile</label><select><option>Edy SP</option><option>Top ranked player</option></select><label>Ranking display</label><select><option>Official FLPR Rating</option><option>Win Rate</option></select><p class="note">Settings are stored locally in the browser in the next release.</p></div>`}
 function about(){active('about');app.innerHTML=head('About FLPR','Fair. Dynamic. Competitive.')+`<div class="card formCard"><h2>Every Point Matters</h2><p>FLPR is a ranking and handicap engine for recurring padel communities. It combines performance, opponent difficulty, consistency, recent form, and reliability.</p><p>The current database contains <b>${D.players.length} players</b>, <b>${D.kpis['Valid Matches']} valid matches</b>, and <b>${D.kpis['Player-Match Records']} player-match records</b>.</p></div>`}
 function playerPage(slug){
@@ -186,6 +208,7 @@ const PAGE_REGISTRY={
  about
 };
 function route(explicitRoute){
+ document.body.classList.remove('importRoute');
  ensureAppShell();
  const current=normalizeRoute(explicitRoute||location.hash.slice(1));
  document.querySelector('.topbar')?.classList.add('landingTopbar');
@@ -254,6 +277,15 @@ function handleAppKeydown(event){
 document.addEventListener('click',handleAppClick,false);
 document.addEventListener('keydown',handleAppKeydown,false);
 window.addEventListener('hashchange',()=>{if(D)route();});
+
+const shellGuard=new MutationObserver(()=>{
+ const topbar=document.querySelector('#shell > .topbar');
+ if(!topbar||!mobileMenu)return;
+ if(topbar.hidden||getComputedStyle(topbar).display==='none'||getComputedStyle(mobileMenu).display==='none')ensureAppShell();
+});
+shellGuard.observe(document.getElementById('shell'),{subtree:true,attributes:true,attributeFilter:['class','style','hidden']});
+window.addEventListener('pageshow',ensureAppShell);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)ensureAppShell();});
 
 fetch('flpr-data.json',{cache:'no-store'})
  .then(response=>{if(!response.ok)throw Error(`HTTP ${response.status}`);return response.json();})
