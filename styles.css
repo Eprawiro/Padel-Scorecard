@@ -200,3 +200,23 @@ body.importRoute #mobileMenu{display:block!important}
  .tournamentArchiveCard .eventSummaryHead p{font-size:10px!important}
  .tournamentPendingNote{font-size:9px;margin-top:8px;padding:8px}
 }
+
+
+/* v2.0.7 Milestone 1.5 — font-independent hamburger and honest archive states */
+#mobileMenu{
+ width:58px!important;height:52px!important;padding:10px!important;
+ display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:7px!important;
+ font-size:0!important;color:transparent!important;background:transparent!important;border:0!important;
+ visibility:visible!important;opacity:1!important;pointer-events:auto!important;
+}
+#mobileMenu span{display:block!important;width:36px!important;height:4px!important;border-radius:4px!important;background:#fff!important;flex:0 0 auto!important;opacity:1!important;visibility:visible!important;pointer-events:none!important}
+body.importRoute #mobileMenu{display:flex!important}
+.archiveUnavailable{margin-top:14px;padding:18px;border:1px dashed #31526a;border-radius:10px;text-align:center;background:#081a27}
+.archiveUnavailable>span{display:inline-block;padding:5px 9px;border:1px solid #8b6b0b;border-radius:999px;color:#f4c52e;font-size:10px;font-weight:800;letter-spacing:.08em}
+.archiveUnavailable h3{margin:12px 0 7px;font-size:16px}
+.archiveUnavailable p{margin:0;color:#93a5b4;font-size:12px;line-height:1.55}
+@media(max-width:800px){#mobileMenu{right:10px!important;top:10px!important;width:54px!important;height:52px!important}.archiveUnavailable{padding:13px}.archiveUnavailable h3{font-size:13px}.archiveUnavailable p{font-size:10px}}
+/* v2.1 Historical Tournament Import Engine */
+#mobileMenu{position:fixed!important;right:max(14px,env(safe-area-inset-right))!important;top:max(12px,env(safe-area-inset-top))!important;width:58px!important;height:54px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:7px!important;z-index:10000!important;background:#07131f!important;border:1px solid #1d3c52!important;border-radius:9px!important}
+#mobileMenu span{width:36px!important;height:4px!important;background:#fff!important;border-radius:4px!important;display:block!important;flex:none!important}
+.importEngine textarea{width:100%;background:#071522;border:1px solid #24455e;color:#fff;padding:13px;border-radius:7px;margin:7px 0 17px;resize:vertical}.importActions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.importStatus{margin-top:16px;padding:13px;border-radius:7px;border:1px solid #28465b;color:#b7c4cf;background:#091d2b}.importStatus.success{border-color:#3f7b2a;color:#9bef72}.importStatus.warning{border-color:#80611a;color:#ffd96a}.importStatus.error{border-color:#842f2b;color:#ff9992}.archiveStatus{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.archiveStatus div{padding:12px;border:1px solid #21445d;border-radius:7px;text-align:center}.archiveStatus b,.archiveStatus span{display:block}.archiveStatus b{color:#f4bf20;font-size:20px}.archiveStatus span{color:#9cabb8;font-size:11px;margin-top:4px}@media(max-width:800px){.archiveStatus{grid-template-columns:repeat(2,1fr)}#mobileMenu{right:12px!important;top:10px!important}}
