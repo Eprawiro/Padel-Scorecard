@@ -1,16 +1,12 @@
-# FLPR Premium 3.0 — Clean Foundation RC1
+# FLPR Premium 3.0 — Visual Identity RC2
 
 Flat, no-build static application for GitHub → Netlify deployment.
 
-## Deploy
-Replace all files in the repository root. Netlify publish directory should be the repository root (`.`).
+## RC2 changes
+- Restored premium 1–2–3 podium stage
+- Ranking is now a competitive table with rating, handicap, win rate, status, and movement
+- All Players is now a separate alphabetical player directory with search
+- Home includes latest tournament podium and current Top 10 ranking
+- Clean 3.0 router/data foundation retained
 
-## Foundation acceptance scope
-- One persistent header and hamburger menu
-- One native hash router
-- Home, Tournaments, Scoreboard, Ranking, Players, Scorecard, Statistics, Import, About, Appendix
-- Back/forward and direct-hash refresh support
-- Visible error fallback instead of a blank page
-- Workbook-derived `flpr-data.json`
-
-Historical T1–T4 details are intentionally not fabricated. They remain pending until verified source data is imported.
+Replace all files in the repository root. Netlify publish directory should remain `.`.
