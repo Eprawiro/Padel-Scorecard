@@ -1,18 +1,14 @@
-# FLPR Premium 3.0 — Visual Identity RC2
+# FLPR Premium — Final Production Candidate
 
-Flat, no-build static application for GitHub → Netlify deployment.
+Flat Netlify deployment package. No npm, framework, or build step required.
 
-## RC2 changes
-- Restored premium 1–2–3 podium stage
-- Ranking is now a competitive table with rating, handicap, win rate, status, and movement
-- All Players is now a separate alphabetical player directory with search
-- Home includes latest tournament podium and current Top 10 ranking
-- Clean 3.0 router/data foundation retained
+Highlights:
+- Stable hash router and mobile navigation
+- Podium stage 1–2–3
+- Ranking and full scoreboard
+- Player Scorecards directory (no forced default player)
+- Expanded player analytics: radar, statistical bars, rating/momentum profile, partner and opponent matrix, development analysis
+- Official player photos included for Nicholas, David, Hansen, Donny, Ricky, Reza, and Kennard
+- Workbook-connected JSON dataset
 
-Replace all files in the repository root. Netlify publish directory should remain `.`.
-
-
-RC3 changes:
-- Removed All Players navigation.
-- Player Scorecards now opens a searchable player directory.
-- Detailed scorecards restored with performance, intelligence, development, partner/opponent, rating drivers, and data status panels.
+Deploy the contents of this ZIP directly to the repository root or Netlify drag-and-drop.
