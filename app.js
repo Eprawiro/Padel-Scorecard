@@ -266,11 +266,11 @@ function hallOfFame(){
 }
 
 function parseStandings(text){return text.split(/\n+/).map(x=>x.trim()).filter(Boolean).map((line,i)=>{const m=line.match(/^\s*(?:(\d+)[.)-]?\s*)?(.+?)\s+(-?\d+(?:\.\d+)?)\s*(?:pts?|points?)?\s*$/i);if(!m)return null;return {rank:Number(m[1]||i+1),name:m[2].trim(),points:Number(m[3])};}).filter(Boolean).sort((a,b)=>a.rank-b.rank);}
-function importedSourceIds(){return loadImportedTournaments().map(t=>String(t.sourceId||'').toLowerCase()).filter(Boolean);}
+function importedSourceIds(){return loadImportedTournaments().map(t=>String(t.sourceId||'').toLowerCase()).filter(Boolean);}let FLPR_PENDING_PREVIEW=null;
 function playerAliases(){return {'niko':'Nico','nico':'Nico'};}
 function previewStatusBadge(status){const cls=status==='PASS'?'strong':status==='REVIEW'?'steady':'developing';return badge(status,cls);}
 function renderAutoPreview(preview){
-  const duplicate=importedSourceIds().includes(String(preview.sourceId||'').toLowerCase());
+  const duplicate=Boolean(preview.duplicate)||importedSourceIds().includes(String(preview.sourceId||'').toLowerCase());
   const summary=preview.summary||{};
   const standings=preview.standings||[];
   const warnings=(preview.validation?.warnings||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join('');
@@ -288,15 +288,17 @@ function renderAutoPreview(preview){
     <div class="panel-head"><h3>Player identity preview</h3>${badge(`${summary.newPlayers||0} new`)}</div>
     <div class="table-wrap"><table class="table"><thead><tr><th>Rank</th><th>Player</th><th>W-L-T</th><th>Diff</th><th>Points</th><th>FLPR match</th></tr></thead><tbody>${playerRows}</tbody></table></div>
     <div class="panel-head"><h3>Round parsing preview</h3>${badge(`${summary.completedMatches||0} complete`)}</div>
-    ${matchRows?`<div class="table-wrap"><table class="table"><thead><tr><th>Round</th><th>Court</th><th>Team A</th><th>Score</th><th>Team B</th><th>Status</th></tr></thead><tbody>${matchRows}</tbody></table></div>`:'<div class="notice">No match rows were parsed. Standings are available, but the page structure requires review before Phase 2.2.</div>'}
-    <div class="phase-gate"><strong>Phase 2.1 gate</strong><p>This preview must be reviewed before player creation, recalculation, database insertion, or publishing is enabled in later Phase 2 sprints.</p></div>
+    ${matchRows?`<div class="table-wrap"><table class="table"><thead><tr><th>Round</th><th>Court</th><th>Team A</th><th>Score</th><th>Team B</th><th>Status</th></tr></thead><tbody>${matchRows}</tbody></table></div>`:'<div class="notice">No match rows were parsed. Standings are available, but the page structure requires review before Confirm & Publish is enabled.</div>'}
+    <div class="phase-gate"><strong>Phase 2.2C Confirm & Publish</strong><p>Review all player identities and match rows. Publishing writes the tournament to Supabase and recalculates ranking, rating, handicap, statistics, provisional status, and audit history.</p>
+    ${!duplicate&&preview.validation?.status!=='FAIL'&&Number(summary.matches||0)>0?'<button class="button" id="confirmPublishTournament">Confirm & Publish Tournament</button>':'<button class="button" disabled>Confirm unavailable</button>'}
+    <div id="confirmPublishStatus"></div></div>
   </section>`;
 }
 function importPage(){const count=loadImportedTournaments().length;return `${title('Tournament Import Preview','Paste one official Americano result link. FLPR will fetch, parse, validate, detect existing/new players, and check duplicates without changing any live data.')}<section class="panel import-box phase21">
-  <div class="phase-banner"><div><small>PHASE 2.1</small><strong>Automatic Americano Preview Engine</strong></div>${badge('No database writes')}</div>
-  <div class="notice"><strong>Safe test mode:</strong> this sprint performs URL validation, server-side fetch, standings parsing, round parsing, player matching, fingerprinting, and duplicate detection. It does not update ranking, handicap, scorecards, Statistics Center, or Tournament Center.</div>
+  <div class="phase-banner"><div><small>PHASE 2.2C</small><strong>Supabase Import · Confirm · Recalculate</strong></div>${badge('Transactional publish')}</div>
+  <div class="notice"><strong>Production confirmation flow:</strong> preview remains read-only. Only the separate Confirm & Publish action writes the verified tournament and recalculates the central FLPR database in one transaction.</div>
   <div class="field"><label for="autoSourceUrl">Official Americano result URL</label><div class="url-action"><input class="input" id="autoSourceUrl" inputmode="url" autocomplete="url" placeholder="https://americano-padel.com/r/…"><button class="button" id="fetchAmericanoPreview">Fetch & Preview</button></div></div>
-  <div class="preview-checklist"><span>✓ Official URL validation</span><span>✓ Server-side fetch</span><span>✓ Standings & rounds</span><span>✓ Existing/new players</span><span>✓ Duplicate fingerprint</span><span>✓ Zero data changes</span></div>
+  <div class="preview-checklist"><span>✓ Official URL validation</span><span>✓ Server-side fetch</span><span>✓ Standings & rounds</span><span>✓ Existing/new players</span><span>✓ Duplicate fingerprint</span><span>✓ Transactional publish</span></div>
   <div id="autoImportResult"></div>
   <details class="legacy-import"><summary>Manual verified-standing fallback</summary><p class="muted">Use this only if the external page cannot be parsed. It remains a local browser archive and does not recalculate FLPR.</p><div class="import-grid"><div class="field"><label for="tournamentId">Tournament ID</label><input class="input" id="tournamentId" placeholder="TEST-T6"></div><div class="field"><label for="tournamentDate">Date</label><input class="input" id="tournamentDate" type="date"></div><div class="field"><label for="tournamentName">Tournament name</label><input class="input" id="tournamentName" placeholder="Dummy Americano"></div><div class="field"><label for="sourceUrl">Official result URL</label><input class="input" id="sourceUrl" placeholder="https://americano-padel.com/r/…"></div></div><div class="field"><label for="rawResult">Verified final standings — one player per line</label><textarea class="textarea" id="rawResult" placeholder="1. Player Name 23&#10;2. Player Name 22&#10;3. Player Name 19"></textarea></div><div class="actions"><button class="button secondary" id="previewImport">Validate Manual Data</button><button class="button secondary" id="saveImport">Save Local Snapshot</button><button class="button secondary" id="exportArchive">Export Archive JSON</button></div><div id="importResult"></div></details>
   <p class="muted">Locally stored legacy snapshots: ${count}</p>
@@ -319,23 +321,49 @@ function wirePage(name){
       out.innerHTML='<div class="import-loading"><span class="spinner"></span><div><strong>Reading Americano result page</strong><p>Fetching the official page and validating standings, rounds, players, and duplicate identity.</p></div></div>';
       try{
         const requestBody=JSON.stringify({url,knownPlayers:DATA.players.map(p=>({name:p.name,slug:p.slug})),aliases:playerAliases()});
-        const apiBase=String(window.FLPR_CONFIG?.importApiBase||'').replace(/\/$/,'');
-        if(!apiBase){
-          out.innerHTML='<div class="error"><strong>Import service is not configured.</strong><br>Deploy <code>americano-worker.js</code> as a Cloudflare Worker, then paste its HTTPS URL into <code>flpr-config.js</code>.</div>';
+        const supabaseUrl=String(window.FLPR_CONFIG?.supabaseUrl||'').replace(/\/$/,'');
+        const anonKey=String(window.FLPR_CONFIG?.supabaseAnonKey||'');
+        if(!supabaseUrl||!anonKey){
+          out.innerHTML='<div class="error"><strong>Supabase connection is not configured.</strong> Check <code>flpr-config.js</code>.</div>';
           return;
         }
+        const endpoint=`${supabaseUrl}/functions/v1/americano-preview`;
         let res;
         try{
-          res=await fetch(`${apiBase}/preview`,{method:'POST',headers:{'content-type':'application/json'},body:requestBody});
+          res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','apikey':anonKey,'authorization':`Bearer ${anonKey}`},body:requestBody});
         }catch(error){
-          out.innerHTML=`<div class="error"><strong>Import service unreachable.</strong> ${escapeHtml(error?.message||'Network request failed.')}<br><small>Verify <code>${escapeHtml(apiBase)}/health</code>.</small></div>`;
+          out.innerHTML=`<div class="error"><strong>Supabase import service unreachable.</strong> ${escapeHtml(error?.message||'Network request failed.')}<br><small>Confirm that the <code>americano-preview</code> Edge Function is deployed.</small></div>`;
           return;
         }
         const contentType=res.headers.get('content-type')||'';
         const body=contentType.includes('application/json')?await res.json():{ok:false,error:`Preview service returned HTTP ${res.status} with a non-JSON response.`};
         if(!res.ok||!body.ok){const detail=body.preview?renderAutoPreview(body.preview):'';out.innerHTML=`<div class="error"><strong>Preview failed.</strong> ${escapeHtml(body.error||`Preview service returned HTTP ${res.status}.`)}</div>${detail}`;return;}
+        FLPR_PENDING_PREVIEW=body.preview;
         out.innerHTML=renderAutoPreview(body.preview);
-      }catch(err){out.innerHTML=`<div class="error"><strong>Preview service unavailable.</strong> ${escapeHtml(err.message)}<br><small>Check the Worker URL in flpr-config.js and confirm the Worker health endpoint is ready.</small></div>`;}
+        document.getElementById('confirmPublishTournament')?.addEventListener('click',async()=>{
+          const button=document.getElementById('confirmPublishTournament');
+          const status=document.getElementById('confirmPublishStatus');
+          if(!FLPR_PENDING_PREVIEW||!button||!status)return;
+          if(!window.confirm(`Publish ${FLPR_PENDING_PREVIEW.title}? This will update the central FLPR database.`))return;
+          button.disabled=true;button.textContent='Publishing…';
+          status.innerHTML='<div class="import-loading"><span class="spinner"></span><div><strong>Committing tournament</strong><p>Updating players, matches, ranking, rating, handicap, statistics, and audit history.</p></div></div>';
+          try{
+            const confirmRes=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','apikey':anonKey,'authorization':`Bearer ${anonKey}`},body:JSON.stringify({action:'confirm',confirmation:'CONFIRM',preview:FLPR_PENDING_PREVIEW})});
+            const confirmType=confirmRes.headers.get('content-type')||'';
+            const confirmBody=confirmType.includes('application/json')?await confirmRes.json():{ok:false,error:`Confirm service returned HTTP ${confirmRes.status}.`};
+            if(!confirmRes.ok||!confirmBody.ok){
+              status.innerHTML=`<div class="error"><strong>Publish failed.</strong> ${escapeHtml(confirmBody.error||'Unknown error')}${confirmBody.detail?`<br><small>${escapeHtml(confirmBody.detail)}</small>`:''}</div>`;
+              button.disabled=false;button.textContent='Confirm & Publish Tournament';return;
+            }
+            status.innerHTML='<div class="notice"><strong>✓ Tournament published.</strong> The central FLPR ranking, rating, handicap, statistics, provisional status, and audit history were recalculated successfully.</div>';
+            button.textContent='Published';
+            FLPR_PENDING_PREVIEW=null;
+          }catch(error){
+            status.innerHTML=`<div class="error"><strong>Publish service unavailable.</strong> ${escapeHtml(error?.message||'Network request failed.')}</div>`;
+            button.disabled=false;button.textContent='Confirm & Publish Tournament';
+          }
+        });
+      }catch(err){out.innerHTML=`<div class="error"><strong>Preview service unavailable.</strong> ${escapeHtml(err.message)}<br><small>Confirm the Supabase Edge Function is deployed and accessible.</small></div>`;}
       finally{autoButton.disabled=false;autoButton.textContent='Fetch & Preview';}
     });
     const preview=()=>{const standings=parseStandings(document.getElementById('rawResult')?.value.trim()||'');const out=document.getElementById('importResult');if(standings.length<3){out.innerHTML='<div class="notice">Please paste at least three valid standings lines, for example: 1. Player Name 23</div>';return null;}out.innerHTML=`<div class="notice"><strong>Manual preview ready:</strong> ${standings.length} players detected.</div><div class="table-wrap"><table class="table"><thead><tr><th>Rank</th><th>Player</th><th>Points</th></tr></thead><tbody>${standings.map(x=>`<tr><td>${x.rank}</td><td>${escapeHtml(x.name)}</td><td>${x.points}</td></tr>`).join('')}</tbody></table></div>`;return standings;};
