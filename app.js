@@ -327,12 +327,12 @@ function wirePage(name){
           out.innerHTML='<div class="error"><strong>Supabase connection is not configured.</strong> Check <code>flpr-config.js</code>.</div>';
           return;
         }
-        const endpoint=`${supabaseUrl}/functions/v1/americano-preview`;
+        const endpoint=`${supabaseUrl}/functions/v1/flpr-import-engine`;
         let res;
         try{
           res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','apikey':anonKey,'authorization':`Bearer ${anonKey}`},body:requestBody});
         }catch(error){
-          out.innerHTML=`<div class="error"><strong>Supabase import service unreachable.</strong> ${escapeHtml(error?.message||'Network request failed.')}<br><small>Confirm that the <code>americano-preview</code> Edge Function is deployed.</small></div>`;
+          out.innerHTML=`<div class="error"><strong>Supabase import service unreachable.</strong> ${escapeHtml(error?.message||'Network request failed.')}<br><small>Confirm that the <code>flpr-import-engine</code> Edge Function is deployed.</small></div>`;
           return;
         }
         const contentType=res.headers.get('content-type')||'';
