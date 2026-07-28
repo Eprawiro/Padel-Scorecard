@@ -6,7 +6,7 @@ const ROUTES = [
   ['about','About FLPR'],['appendix','Appendix & Definitions']
 ];
 
-const TOURNAMENTS = [
+let TOURNAMENTS = [
   {id:'T5',name:'JakSel T5 – Weekly Americano',date:'20 July 2026',location:'Jakarta Selatan',format:'Americano',courts:2,players:9,totalPoints:140,podium:[['Austin',23],['Sandy',22],['Michael',19]],status:'Complete'},
   {id:'T4',name:'JakSel T4 – Weekly Americano',date:'06 July 2026',location:'Jakarta Selatan',format:'Americano',status:'Awaiting verified historical import'},
   {id:'T3',name:'JakSel T3 – Weekly Americano',date:'29 June 2026',location:'Jakarta Selatan',format:'Americano',status:'Awaiting verified historical import'},
@@ -327,12 +327,12 @@ function wirePage(name){
           out.innerHTML='<div class="error"><strong>Supabase connection is not configured.</strong> Check <code>flpr-config.js</code>.</div>';
           return;
         }
-        const endpoint=`${supabaseUrl}/functions/v1/flpr-import-engine`;
+        const endpoint=`${supabaseUrl}/functions/v1/americano-preview`;
         let res;
         try{
           res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','apikey':anonKey,'authorization':`Bearer ${anonKey}`},body:requestBody});
         }catch(error){
-          out.innerHTML=`<div class="error"><strong>Supabase import service unreachable.</strong> ${escapeHtml(error?.message||'Network request failed.')}<br><small>Confirm that the <code>flpr-import-engine</code> Edge Function is deployed.</small></div>`;
+          out.innerHTML=`<div class="error"><strong>Supabase import service unreachable.</strong> ${escapeHtml(error?.message||'Network request failed.')}<br><small>Confirm that the <code>americano-preview</code> Edge Function is deployed.</small></div>`;
           return;
         }
         const contentType=res.headers.get('content-type')||'';
@@ -372,5 +372,5 @@ function wirePage(name){
     document.getElementById('exportArchive')?.addEventListener('click',()=>{const blob=new Blob([JSON.stringify(loadImportedTournaments(),null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='flpr-verified-tournament-archive.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
   }
 }
-async function init(){buildDrawer();menuButton.addEventListener('click',()=>setMenu(!drawer.classList.contains('open')));backdrop.addEventListener('click',()=>setMenu(false));drawer.addEventListener('click',e=>{if(e.target.closest('#drawerClose')||e.target.closest('a'))setMenu(false);});document.addEventListener('click',e=>{const info=e.target.closest('[data-info]');if(info){e.preventDefault();openInfo(info.dataset.info);return;}if(e.target.closest('[data-close-info]'))closeInfo();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeInfo();});window.addEventListener('hashchange',render);try{const res=await fetch('flpr-data.json',{cache:'no-store'});if(!res.ok)throw new Error(`Data load failed (${res.status})`);DATA=await res.json();render();}catch(err){console.error(err);app.innerHTML=`<div class="error"><h2>FLPR data could not be loaded</h2><p>${escapeHtml(err.message)}</p></div>`;}}
+async function init(){buildDrawer();menuButton.addEventListener('click',()=>setMenu(!drawer.classList.contains('open')));backdrop.addEventListener('click',()=>setMenu(false));drawer.addEventListener('click',e=>{if(e.target.closest('#drawerClose')||e.target.closest('a'))setMenu(false);});document.addEventListener('click',e=>{const info=e.target.closest('[data-info]');if(info){e.preventDefault();openInfo(info.dataset.info);return;}if(e.target.closest('[data-close-info]'))closeInfo();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeInfo();});window.addEventListener('hashchange',render);try{const res=await fetch('flpr-data.json',{cache:'no-store'});if(!res.ok)throw new Error(`Data load failed (${res.status})`);const snapshot=await res.json();DATA=snapshot;if(window.FLPR_LIVE?.enabled()){try{DATA=await window.FLPR_LIVE.hydrate(snapshot);TOURNAMENTS=DATA.tournaments||TOURNAMENTS;console.info('FLPR live Supabase integration active',DATA.live);}catch(liveError){console.error('Live Supabase load failed; snapshot fallback active.',liveError);DATA={...snapshot,meta:{...(snapshot.meta||{}),dataMode:'SNAPSHOT FALLBACK — SUPABASE LOAD FAILED'},live:{ok:false,error:liveError.message}};}}render();}catch(err){console.error(err);app.innerHTML=`<div class="error"><h2>FLPR data could not be loaded</h2><p>${escapeHtml(err.message)}</p></div>`;}}
 init();
