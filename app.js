@@ -243,7 +243,7 @@ function comparisonChart(p){
   const metrics=[['Adjusted Win',p.adjustedWinRate,fieldAverage('adjustedWinRate')],['Dominance',p.dominance,fieldAverage('dominance')],['Consistency',p.consistency,fieldAverage('consistency')],['Clutch',p.clutch,fieldAverage('clutch')],['Schedule',p.sos,fieldAverage('sos')],['Versatility',p.versatility,fieldAverage('versatility')]];
   return `<div class="comparison-chart">${metrics.map(([label,val,avg])=>`<div class="comparison-row"><div class="comparison-label"><span>${escapeHtml(label)}</span><small>You ${Number(val).toFixed(1)} · Field ${Number(avg).toFixed(1)}</small></div><div class="comparison-track"><i class="field" style="width:${Math.max(0,Math.min(100,avg))}%"></i><i class="player" style="width:${Math.max(0,Math.min(100,val))}%"></i></div></div>`).join('')}<div class="comparison-legend"><span><i class="legend-player"></i>Player</span><span><i class="legend-field"></i>Field average</span></div></div>`;
 }
-function verifiedHistory(p){const snapshots=loadImportedTournaments().filter(t=>Array.isArray(t.standings)).map(t=>{const row=t.standings.find(x=>slugify(x.name)===p.slug);return row?{label:t.id,points:row.points,rank:row.rank,date:t.date}:null;}).filter(Boolean);return snapshots;}
+function verifiedHistory(p){if(Array.isArray(p.tournamentFinishHistory)&&p.tournamentFinishHistory.length)return p.tournamentFinishHistory.map(x=>({label:x.label||x.tournamentId||x.name||'Tournament',points:Number(x.totalPoints||0),rank:Number(x.finalPosition),date:x.date||x.dateISO||''})).filter(x=>Number.isFinite(x.rank)&&x.rank>=1);const snapshots=loadImportedTournaments().filter(t=>Array.isArray(t.standings)).map(t=>{const row=t.standings.find(x=>x.playerId===p.id||slugify(x.name)===p.slug);const rank=Number(row?.finalPosition??row?.rank);const points=Number(row?.totalPoints??row?.points??0);return row&&Number.isFinite(rank)&&rank>=1?{label:t.id,points,rank,date:t.date}:null;}).filter(Boolean);return snapshots;}
 function placementIcon(rank){return Number(rank)===1?'🏆':Number(rank)===2?'🥈':Number(rank)===3?'🥉':'🎾';}
 function historyPanel(p){const h=verifiedHistory(p);if(!h.length)return `<div class="data-status pending"><span>◷</span><div><b>Verified tournament timeline pending</b><p>No tournament-level snapshots are stored in this browser yet. Import verified standings in Data Import and this section will populate automatically.</p></div></div>`;return `<div class="history-timeline premium">${h.map((x,i)=>`<div class="timeline-event"><span class="timeline-icon">${placementIcon(x.rank)}</span><div><b>${escapeHtml(x.label)}</b><span>${escapeHtml(x.date)}</span><strong>#${x.rank} · ${x.points} pts</strong></div>${i<h.length-1?'<i class="timeline-connector"></i>':''}</div>`).join('')}</div>`;}
 function verifiedTrendPanel(p){const h=verifiedHistory(p);if(!h.length)return `<div class="data-status pending"><span>◷</span><div><b>Verified trend pending</b><p>Import approved tournament standings to display actual points and placement history.</p></div></div>`;const labels=h.map(x=>x.label);return `<div class="verified-trend-grid"><div><h4>Points by Tournament</h4>${profileChart(h.map(x=>x.points),labels,'Verified tournament points')}</div><div><h4>Placement by Tournament</h4>${profileChart(h.map(x=>-x.rank),labels,'Verified tournament placement')}<p class="chart-note">Higher on the chart means a better finishing position.</p></div></div>`;}
@@ -263,11 +263,11 @@ function relationshipHighlights(p){const a=p.analysis||{};return `<div class="re
 function analyticsTrendLabel(value){return String(value||'STABLE').replaceAll('_',' ');}
 function analyticsMovement(value){const n=Number(value||0);return n>0?`▲ +${n}`:n<0?`▼ ${n}`:'— 0';}
 function intelligenceBadges(p,history,c){
-  const podiums=history.filter(x=>Number(x.rank)<=3).length||Number(p.tournamentTop3Count||0);
+  const podiums=Number.isFinite(Number(p.tournamentTop3Count))?Number(p.tournamentTop3Count):history.filter(x=>Number(x.rank)<=3).length;
   const badges=[];
-  if(history.some(x=>Number(x.rank)===1))badges.push(['🏆','Champion']);
-  if(history.some(x=>Number(x.rank)===2))badges.push(['🥈','Runner-up']);
-  if(history.some(x=>Number(x.rank)===3))badges.push(['🥉','Bronze Medalist']);
+  if(Number(p.tournamentChampionships||0)>0||history.some(x=>Number(x.rank)===1))badges.push(['🏆','Champion']);
+  if(Number(p.tournamentRunnerUps||0)>0||history.some(x=>Number(x.rank)===2))badges.push(['🥈','Runner-up']);
+  if(Number(p.tournamentThirdPlaces||0)>0||history.some(x=>Number(x.rank)===3))badges.push(['🥉','Bronze Medalist']);
   if(podiums>=3)badges.push(['🏅','Podium Regular']);
   if(Number(p.consistency||0)>=90)badges.push(['💯','Consistency Master']);
   if(momentumScore(p)>=70)badges.push(['🔥','Hot Form']);
@@ -277,8 +277,8 @@ function intelligenceBadges(p,history,c){
   return badges.slice(0,8);
 }
 function careerCoach(p,history,c){
-  const podiums=history.filter(x=>Number(x.rank)<=3).length||Number(p.tournamentTop3Count||0);
-  const wins=history.filter(x=>Number(x.rank)===1).length;
+  const podiums=Number.isFinite(Number(p.tournamentTop3Count))?Number(p.tournamentTop3Count):history.filter(x=>Number(x.rank)<=3).length;
+  const wins=Number.isFinite(Number(p.tournamentChampionships))?Number(p.tournamentChampionships):history.filter(x=>Number(x.rank)===1).length;
   const strengths=[]; const next=[];
   if(Number(p.consistency||0)>=85)strengths.push('Excellent performance consistency');
   if(podiums>=2)strengths.push(`${podiums} podium finishes show strong tournament competitiveness`);
@@ -297,10 +297,10 @@ function historicalAnalyticsDashboard(p){
   const c=p.careerAnalytics,t=Array.isArray(p.analyticsTimeline)?p.analyticsTimeline:[],h=verifiedHistory(p);
   if(!c)return `<section class="score-panel panel analytics-dashboard pending"><div class="panel-head"><h3>Player Intelligence Dashboard</h3>${badge('Phase 3.4A')}</div><div class="data-status pending"><span>◷</span><div><b>Historical analytics unavailable</b><p>Confirm Phase 3.3A and Supabase access, then reload.</p></div></div></section>`;
   const appearances=Math.max(Number(p.tournamentAppearanceCount||0),h.length);
-  const champions=h.filter(x=>Number(x.rank)===1).length;
-  const runners=h.filter(x=>Number(x.rank)===2).length;
-  const thirds=h.filter(x=>Number(x.rank)===3).length;
-  const podiums=h.length?(champions+runners+thirds):Number(p.tournamentTop3Count||0);
+  const champions=Number.isFinite(Number(p.tournamentChampionships))?Number(p.tournamentChampionships):h.filter(x=>Number(x.rank)===1).length;
+  const runners=Number.isFinite(Number(p.tournamentRunnerUps))?Number(p.tournamentRunnerUps):h.filter(x=>Number(x.rank)===2).length;
+  const thirds=Number.isFinite(Number(p.tournamentThirdPlaces))?Number(p.tournamentThirdPlaces):h.filter(x=>Number(x.rank)===3).length;
+  const podiums=champions+runners+thirds;
   const finishes=h.map(x=>Number(x.rank)).filter(Number.isFinite);
   const avgFinish=finishes.length?(finishes.reduce((a,b)=>a+b,0)/finishes.length).toFixed(1):'—';
   const bestFinish=finishes.length?Math.min(...finishes):null;

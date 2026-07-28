@@ -141,11 +141,32 @@ window.FLPR_LIVE = (() => {
       }
       // Tournament Top-3 rate must use verified final standings, not ranking snapshots
       // and not player_statistics.podiums (which can represent a different aggregate).
-      const appearances=tournaments.filter(t=>Array.isArray(t.standings)&&t.standings.some(s=>s.playerId===player.id));
-      const top3=appearances.filter(t=>t.standings.some(s=>s.playerId===player.id && s.finalPosition>=1 && s.finalPosition<=3)).length;
+      const finishHistory=tournaments.map(t=>{
+        if(!Array.isArray(t.standings)) return null;
+        const standing=t.standings.find(s=>s.playerId===player.id);
+        if(!standing || !Number.isFinite(Number(standing.finalPosition)) || Number(standing.finalPosition)<1) return null;
+        return {
+          tournamentId:t.id,
+          tournamentUuid:t.uuid,
+          label:t.id,
+          name:t.name,
+          date:t.date,
+          dateISO:t.dateISO,
+          finalPosition:Number(standing.finalPosition),
+          totalPoints:num(standing.totalPoints)
+        };
+      }).filter(Boolean);
+      const championships=finishHistory.filter(x=>x.finalPosition===1).length;
+      const runnerUps=finishHistory.filter(x=>x.finalPosition===2).length;
+      const thirdPlaces=finishHistory.filter(x=>x.finalPosition===3).length;
+      const top3=championships+runnerUps+thirdPlaces;
+      player.tournamentFinishHistory=finishHistory;
+      player.tournamentChampionships=championships;
+      player.tournamentRunnerUps=runnerUps;
+      player.tournamentThirdPlaces=thirdPlaces;
       player.tournamentTop3Count=top3;
-      player.tournamentAppearanceCount=appearances.length;
-      player.tournamentTop3Rate=appearances.length ? top3/appearances.length*100 : 0;
+      player.tournamentAppearanceCount=finishHistory.length;
+      player.tournamentTop3Rate=finishHistory.length ? top3/finishHistory.length*100 : 0;
     }
     const kpis={...(snapshot.kpis||{})};
     kpis.Players=players.length;
@@ -156,7 +177,7 @@ window.FLPR_LIVE = (() => {
     kpis['Average Rating']=players.length?Number((players.reduce((a,p)=>a+p.rating,0)/players.length).toFixed(2)):0;
     return {
       ...snapshot,
-      meta:{...(snapshot.meta||{}),version:'3.3B Player Analytics Dashboard',dataMode:'LIVE SUPABASE + HISTORICAL ANALYTICS',sourceWorkbook:'Supabase live database (advanced analytics fallback from Phase 2.2C snapshot)',liveLoadedAt:new Date().toISOString()},
+      meta:{...(snapshot.meta||{}),version:'3.4A.2 Tournament Finish Integrity Fix',dataMode:'LIVE SUPABASE + HISTORICAL ANALYTICS',sourceWorkbook:'Supabase live database (advanced analytics fallback from Phase 2.2C snapshot)',liveLoadedAt:new Date().toISOString()},
       kpis,players,
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
       live:{ok:true,players:players.length,tournaments:tournaments.length,loadedAt:new Date().toISOString()},
