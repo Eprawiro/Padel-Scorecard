@@ -42,7 +42,8 @@ function navLink(id,label){return `<a href="#${id}" data-route="${id}">${label}<
 function buildDrawer(){drawer.innerHTML=`<div class="drawer-head"><strong>FLPR Menu</strong><button class="drawer-close" id="drawerClose" aria-label="Close menu">×</button></div>${ROUTES.map(r=>navLink(...r)).join('')}`;}
 function setMenu(open){drawer.classList.toggle('open',open);drawer.setAttribute('aria-hidden',String(!open));menuButton.setAttribute('aria-expanded',String(open));backdrop.hidden=!open;document.body.style.overflow=open?'hidden':'';}
 function title(t,s){return `<h1 class="page-title">${escapeHtml(t)}</h1><p class="subtitle">${escapeHtml(s)}</p>`;}
-function stats(items){return `<div class="grid stats">${items.map(([a,b])=>`<div class="stat"><span>${escapeHtml(a)}</span><strong>${escapeHtml(b)}</strong></div>`).join('')}</div>`;}
+function displayValue(value,fallback='—'){if(value===null||value===undefined||value==='')return fallback;if(typeof value==='number'&&!Number.isFinite(value))return fallback;return value;}
+function stats(items){return `<div class="grid stats">${items.map(([a,b])=>`<div class="stat"><span>${escapeHtml(a)}</span><strong>${escapeHtml(displayValue(b))}</strong></div>`).join('')}</div>`;}
 function pct(v){return `${Number(v||0).toFixed(1)}%`;}
 function signed(v){const n=Number(v||0);return `${n>0?'+':''}${n.toFixed(2)}`;}
 function badge(text,cls=''){return `<span class="badge ${cls}">${escapeHtml(text)}</span>`;}
@@ -130,17 +131,25 @@ function home(){
   const top10=DATA.players.slice().sort((a,b)=>a.rank-b.rank).slice(0,10);
   const topMover=leaderboard('ratingChange.rankMovement',true)[0];
   return `<section class="hero"><div class="eyebrow">Padel Tournament Board</div><h1>Every Point Matters.</h1><p>Official tournament results, ranking, handicap, player development, statistics, and hall of fame in one stable platform.</p><div class="actions"><a class="button" href="#tournaments">Tournament Center</a><a class="button secondary" href="#scorecard">Player Scorecards</a></div></section>
-  <h2 class="section-title">Latest Tournament Podium</h2>${podium(getTournaments().find(t=>t.players)?.podium||TOURNAMENTS[0].podium)}
+  <h2 class="section-title">Latest Tournament Podium</h2>${(()=>{const p=getTournaments().find(t=>Array.isArray(t.podium)&&t.podium.length>=3)?.podium;return p?podium(p):'<div class="notice">Podium data is not available yet.</div>';})()}
   ${stats([['Players',DATA.players.length],['Tournaments',getTournaments().length],['Valid Matches',DATA.kpis['Valid Matches']],['Top Mover',topMover?.name||'Baseline']])}
   <div class="section-heading"><h2 class="section-title">Current Top 10 Ranking</h2><a href="#ranking">View full ranking →</a></div><div class="ranking-list compact">${top10.map(rankingRow).join('')}</div>
   <div class="section-heading"><h2 class="section-title">Hall of Fame Preview</h2><a href="#halloffame">Open Hall of Fame →</a></div>${awardGrid(DATA.awards.slice(0,4))}`;
 }
 
 function tournamentStats(t){
-  if(!t.players)return `<div class="notice"><strong>${escapeHtml(t.status)}</strong><br>Statistics, champion, and scoreboard will be published only after verified historical data is imported.</div>`;
-  const avg=(t.totalPoints/t.players).toFixed(1);
-  const spread=t.podium[0][1]-t.podium[2][1];
-  return `<div class="tournament-insights">${stats([['Players',t.players],['Total Points',t.totalPoints],['Average Points',avg],['Podium Spread',spread]])}<div class="insight-grid"><div class="panel mini"><small>Champion</small><strong>${escapeHtml(t.podium[0][0])}</strong><span>${t.podium[0][1]} points</span></div><div class="panel mini"><small>Runner-up Gap</small><strong>${t.podium[0][1]-t.podium[1][1]} point</strong><span>Very competitive finish</span></div><div class="panel mini"><small>Top-3 Cut</small><strong>${t.podium[2][1]} points</strong><span>Minimum verified podium score</span></div></div></div>`;
+  const players=Number(t.players)||0;
+  if(!players)return `<div class="notice"><strong>${escapeHtml(t.status)}</strong><br>Statistics, champion, and scoreboard will be published only after verified historical data is imported.</div>`;
+  const total=Number(t.totalPoints);
+  const avg=Number.isFinite(Number(t.averagePoints)) ? Number(t.averagePoints) : (Number.isFinite(total)&&players ? total/players : null);
+  const podiumItems=Array.isArray(t.podium)?t.podium:[];
+  const champion=podiumItems[0];
+  const runnerUp=podiumItems[1];
+  const third=podiumItems[2];
+  const spread=champion&&third ? Number(champion[1])-Number(third[1]) : null;
+  const gap=champion&&runnerUp ? Number(champion[1])-Number(runnerUp[1]) : null;
+  const detailCards=champion?`<div class="insight-grid"><div class="panel mini"><small>Champion</small><strong>${escapeHtml(champion[0])}</strong><span>${displayValue(champion[1])} points</span></div><div class="panel mini"><small>Runner-up Gap</small><strong>${gap===null?'—':`${gap} point${gap===1?'':'s'}`}</strong><span>${runnerUp?'Verified podium result':'Awaiting complete podium'}</span></div><div class="panel mini"><small>Top-3 Cut</small><strong>${third?`${third[1]} points`:'—'}</strong><span>${third?'Minimum verified podium score':'Awaiting third-place result'}</span></div></div>`:'';
+  return `<div class="tournament-insights">${stats([['Players',players],['Total Points',Number.isFinite(total)?total:'—'],['Average Points',avg===null?'—':avg.toFixed(1)],['Podium Spread',spread===null?'—':spread]])}${detailCards}</div>`;
 }
 
 function championHistory(){
@@ -151,7 +160,7 @@ function tournamentRecords(){const verified=getTournaments().filter(t=>t.players
 function tournamentComparison(){const verified=getTournaments().filter(t=>t.players);return `<section class="panel"><div class="panel-head"><h2>Historical Comparison</h2>${badge(`${verified.length} verified`)}</div>${verified.length<2?'<div class="notice">A cross-tournament comparison will appear after at least two verified tournament standings have been imported.</div>':`<div class="table-wrap"><table class="table"><thead><tr><th>Tournament</th><th>Date</th><th>Players</th><th>Champion</th><th>Winning Points</th><th>Winning Gap</th></tr></thead><tbody>${verified.map(t=>`<tr><td>${escapeHtml(t.id)}</td><td>${escapeHtml(t.date)}</td><td>${t.players}</td><td>${escapeHtml(t.podium[0][0])}</td><td>${t.podium[0][1]}</td><td>${t.podium[0][1]-t.podium[1][1]}</td></tr>`).join('')}</tbody></table></div>`}</section>`;}
 
 function tournaments(){
-  return `${title('Tournament Center','Tournament summaries, podiums, statistics, and champion history.')}<div class="tournament-list">${getTournaments().map(t=>`<article class="tournament-card"><div class="eyebrow">${t.id==='T5'?'Latest Tournament':'Historical Tournament'}</div><h2>${escapeHtml(t.name)}</h2><div class="tournament-meta">${escapeHtml(t.location)} · ${escapeHtml(t.date)} · ${escapeHtml(t.format)}${t.courts?` · ${t.courts} Courts`:''}</div>${t.players?`${podium(t.podium)}${tournamentStats(t)}`:tournamentStats(t)}</article>`).join('')}</div><section class="panel"><div class="panel-head"><h2>Tournament Records</h2>${badge('Verified data')}</div>${tournamentRecords()}</section>${tournamentComparison()}${championHistory()}`;
+  return `${title('Tournament Center','Tournament summaries, podiums, statistics, and champion history.')}<div class="tournament-list">${getTournaments().map((t,index)=>`<article class="tournament-card"><div class="eyebrow">${index===0?'Latest Tournament':'Historical Tournament'}</div><h2>${escapeHtml(t.name)}</h2><div class="tournament-meta">${escapeHtml(t.location)} · ${escapeHtml(t.date)} · ${escapeHtml(t.format)}${t.courts?` · ${t.courts} Courts`:''}</div>${t.players?`${Array.isArray(t.podium)&&t.podium.length>=3?podium(t.podium):''}${tournamentStats(t)}`:tournamentStats(t)}</article>`).join('')}</div><section class="panel"><div class="panel-head"><h2>Tournament Records</h2>${badge('Verified data')}</div>${tournamentRecords()}</section>${tournamentComparison()}${championHistory()}`;
 }
 
 function scoreboard(){

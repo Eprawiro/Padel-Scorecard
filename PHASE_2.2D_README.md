@@ -28,3 +28,7 @@ The frontend never uses the service-role key. Keep the service-role key private.
 
 ## Current hybrid limitation
 Phase 2.2C does not store all workbook-derived advanced metrics (for example clutch, partner chemistry, schedule strength, and coaching text). These fields continue from the snapshot until a later database analytics migration is installed.
+
+
+## Patch 1
+See `PHASE_2.2D_PATCH_1_README.md` for tournament KPI fixes.

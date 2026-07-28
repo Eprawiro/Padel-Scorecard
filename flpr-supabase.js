@@ -76,11 +76,21 @@ window.FLPR_LIVE = (() => {
     const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.desc`);
     let entries=[];
     try{
+      // Load every tournament standing, not only the top three. The complete
+      // set is required to calculate tournament total and average points.
       const tpcols='tournament_id,final_position,total_points,players(display_name)';
-      entries=await rest(`tournament_players?select=${encodeURIComponent(tpcols)}&final_position=lte.3&order=final_position.asc`);
-    }catch(error){ console.warn('Podium query unavailable',error); }
+      entries=await rest(`tournament_players?select=${encodeURIComponent(tpcols)}&order=final_position.asc`);
+    }catch(error){ console.warn('Tournament standings query unavailable',error); }
     return tournaments.map((t,index)=>{
-      const podium=entries.filter(x=>x.tournament_id===t.id).sort((a,b)=>num(a.final_position)-num(b.final_position)).map(x=>[x.players?.display_name||'Player',num(x.total_points)]).slice(0,3);
+      const standings=entries
+        .filter(x=>x.tournament_id===t.id)
+        .sort((a,b)=>num(a.final_position,999)-num(b.final_position,999));
+      const podium=standings
+        .filter(x=>num(x.final_position,999)<=3)
+        .map(x=>[x.players?.display_name||'Player',num(x.total_points)])
+        .slice(0,3);
+      const totalPoints=standings.reduce((sum,x)=>sum+num(x.total_points),0);
+      const playerCount=num(t.player_count,standings.length) || standings.length;
       return {
         id:t.source_tournament_id || `T${tournaments.length-index}`,
         uuid:t.id,
@@ -88,7 +98,9 @@ window.FLPR_LIVE = (() => {
         date:fmtDate(t.published_at||t.imported_at),
         dateISO:String(t.published_at||t.imported_at||'').slice(0,10),
         location:'Jakarta Selatan',format:'Americano',
-        players:num(t.player_count),rounds:num(t.round_count),matches:num(t.match_count),
+        players:playerCount,rounds:num(t.round_count),matches:num(t.match_count),
+        totalPoints,
+        averagePoints:playerCount ? totalPoints/playerCount : null,
         podium,status:'Published · Live Supabase',sourceUrl:t.source_url,live:true
       };
     });
