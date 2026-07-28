@@ -73,7 +73,7 @@ window.FLPR_LIVE = (() => {
   }
   async function loadTournaments(){
     const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,published_at,imported_at,source_url';
-    const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.desc`);
+    const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.asc`);
     let entries=[];
     try{
       // Load every tournament standing, not only the top three. The complete
@@ -92,7 +92,8 @@ window.FLPR_LIVE = (() => {
       const totalPoints=standings.reduce((sum,x)=>sum+num(x.total_points),0);
       const playerCount=num(t.player_count,standings.length) || standings.length;
       return {
-        id:t.source_tournament_id || `T${tournaments.length-index}`,
+        id:t.source_tournament_id || `T${index+1}`,
+        sourceTournamentId:t.source_tournament_id,
         uuid:t.id,
         name:t.name,
         date:fmtDate(t.published_at||t.imported_at),
@@ -116,7 +117,7 @@ window.FLPR_LIVE = (() => {
     kpis['Average Rating']=players.length?Number((players.reduce((a,p)=>a+p.rating,0)/players.length).toFixed(2)):0;
     return {
       ...snapshot,
-      meta:{...(snapshot.meta||{}),version:'2.2D',dataMode:'LIVE SUPABASE CORE + ANALYTICS FALLBACK',sourceWorkbook:'Supabase live database (advanced analytics fallback from Phase 2.2C snapshot)',liveLoadedAt:new Date().toISOString()},
+      meta:{...(snapshot.meta||{}),version:'2.2E Patch 2',dataMode:'LIVE SUPABASE CORE + ANALYTICS FALLBACK',sourceWorkbook:'Supabase live database (advanced analytics fallback from Phase 2.2C snapshot)',liveLoadedAt:new Date().toISOString()},
       kpis,players,
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
       live:{ok:true,players:players.length,tournaments:tournaments.length,loadedAt:new Date().toISOString()},
