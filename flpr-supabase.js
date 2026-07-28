@@ -106,8 +106,38 @@ window.FLPR_LIVE = (() => {
       };
     });
   }
+  async function loadHistoricalAnalytics(){
+    try{
+      const summaryCols='player_id,current_rank,previous_historical_rank,rank_change,trend_status,current_official_rating,previous_official_rating,rating_change,best_rank_ever,worst_rank_ever,average_rank,rank_volatility,number_one_snapshots,top_three_snapshots,top_three_rate,longest_improvement_streak,longest_stability_streak,longest_top3_streak,longest_number_one_streak,snapshot_count,career_rank_improvement,career_rating_change,career_trend_score,career_status,movement_direction,dashboard_tier,first_snapshot_at,latest_snapshot_at';
+      const timelineCols='player_id,snapshot_key,snapshot_source,tournament_id,captured_at,rank,previous_historical_rank,rank_change,rank_trend,official_rating,previous_official_rating,rating_change,player_snapshot_number';
+      const [summaries,timeline]=await Promise.all([
+        rest(`v_flpr_player_analytics_dashboard?select=${encodeURIComponent(summaryCols)}`),
+        rest(`v_flpr_ranking_history_timeline?select=${encodeURIComponent(timelineCols)}&order=captured_at.asc`)
+      ]);
+      const byPlayer=new Map();
+      for(const row of summaries) byPlayer.set(row.player_id,{summary:row,timeline:[]});
+      for(const row of timeline){
+        const item=byPlayer.get(row.player_id)||{summary:null,timeline:[]};
+        item.timeline.push(row); byPlayer.set(row.player_id,item);
+      }
+      return byPlayer;
+    }catch(error){
+      console.warn('Historical analytics unavailable; current scorecard remains active.',error);
+      return new Map();
+    }
+  }
   async function hydrate(snapshot){
-    const [players,tournaments]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments()]);
+    const [players,tournaments,historical]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics()]);
+    for(const player of players){
+      const analytics=historical.get(player.id);
+      if(analytics){
+        player.careerAnalytics=analytics.summary;
+        player.analyticsTimeline=analytics.timeline;
+        if(analytics.summary){
+          player.ratingChange={...(player.ratingChange||{}),delta:num(analytics.summary.rating_change),previousRank:num(analytics.summary.previous_historical_rank,player.rank),currentRank:player.rank,rankMovement:num(analytics.summary.rank_change),event:'Historical Analytics Engine'};
+        }
+      }
+    }
     const kpis={...(snapshot.kpis||{})};
     kpis.Players=players.length;
     kpis['Valid Matches']=Math.round(players.reduce((a,p)=>a+p.matches,0)/4);
@@ -117,7 +147,7 @@ window.FLPR_LIVE = (() => {
     kpis['Average Rating']=players.length?Number((players.reduce((a,p)=>a+p.rating,0)/players.length).toFixed(2)):0;
     return {
       ...snapshot,
-      meta:{...(snapshot.meta||{}),version:'2.2E Patch 2',dataMode:'LIVE SUPABASE CORE + ANALYTICS FALLBACK',sourceWorkbook:'Supabase live database (advanced analytics fallback from Phase 2.2C snapshot)',liveLoadedAt:new Date().toISOString()},
+      meta:{...(snapshot.meta||{}),version:'3.3B Player Analytics Dashboard',dataMode:'LIVE SUPABASE + HISTORICAL ANALYTICS',sourceWorkbook:'Supabase live database (advanced analytics fallback from Phase 2.2C snapshot)',liveLoadedAt:new Date().toISOString()},
       kpis,players,
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
       live:{ok:true,players:players.length,tournaments:tournaments.length,loadedAt:new Date().toISOString()},

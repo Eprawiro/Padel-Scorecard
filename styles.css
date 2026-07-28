@@ -103,3 +103,9 @@
 @media(max-width:800px){.url-action{grid-template-columns:1fr}.url-action .button{width:100%}.preview-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.phase-banner{align-items:flex-start}.preview-result .table-wrap{margin-inline:-2px}}
 @media(max-width:430px){.preview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.phase-banner{display:grid}.source-details{grid-template-columns:1fr}.source-details span{margin-top:4px}}
 @media(prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+
+/* FLPR Phase 3.3B — Player Analytics Dashboard */
+.analytics-dashboard{overflow:hidden}.analytics-subtitle{display:block;color:var(--muted);margin-top:4px}.analytics-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.analytics-kpi-grid>div{padding:16px;border:1px solid var(--line);border-radius:14px;background:#071925}.analytics-kpi-grid small{display:block;color:var(--muted);font-weight:800}.analytics-kpi-grid strong{display:block;margin-top:5px;color:var(--gold);font-size:1.45rem}.analytics-achievements{display:flex;flex-wrap:wrap;gap:9px;margin:16px 0}.analytics-achievements span{padding:8px 11px;border:1px solid var(--line);border-radius:999px;background:#0b2230;font-size:.86rem;font-weight:800}.analytics-charts{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}.analytics-charts>div{min-width:0;padding:14px;border:1px solid var(--line);border-radius:14px;background:#061722}.analytics-charts h4{margin:0 0 8px;color:var(--gold)}
+@media(max-width:900px){.analytics-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-charts{grid-template-columns:1fr}}
+@media(max-width:520px){.analytics-kpi-grid{grid-template-columns:1fr 1fr}.analytics-kpi-grid strong{font-size:1.15rem}.analytics-achievements span{font-size:.76rem}}
