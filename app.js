@@ -223,16 +223,65 @@ function relationshipHighlights(p){const a=p.analysis||{};return `<div class="re
 
 function analyticsTrendLabel(value){return String(value||'STABLE').replaceAll('_',' ');}
 function analyticsMovement(value){const n=Number(value||0);return n>0?`▲ +${n}`:n<0?`▼ ${n}`:'— 0';}
+function intelligenceBadges(p,history,c){
+  const podiums=history.filter(x=>Number(x.rank)<=3).length||Number(p.tournamentTop3Count||0);
+  const badges=[];
+  if(history.some(x=>Number(x.rank)===1))badges.push(['🏆','Champion']);
+  if(history.some(x=>Number(x.rank)===2))badges.push(['🥈','Runner-up']);
+  if(history.some(x=>Number(x.rank)===3))badges.push(['🥉','Bronze Medalist']);
+  if(podiums>=3)badges.push(['🏅','Podium Regular']);
+  if(Number(p.consistency||0)>=90)badges.push(['💯','Consistency Master']);
+  if(momentumScore(p)>=70)badges.push(['🔥','Hot Form']);
+  if(Number(p.tournamentAppearanceCount||0)>=5)badges.push(['🎾','Tournament Veteran']);
+  if(Number(p.matches||0)>=20)badges.push(['🧱','Iron Player']);
+  if(Number(c?.best_rank_ever||99)<=5)badges.push(['⭐','Top 5 Career']);
+  return badges.slice(0,8);
+}
+function careerCoach(p,history,c){
+  const podiums=history.filter(x=>Number(x.rank)<=3).length||Number(p.tournamentTop3Count||0);
+  const wins=history.filter(x=>Number(x.rank)===1).length;
+  const strengths=[]; const next=[];
+  if(Number(p.consistency||0)>=85)strengths.push('Excellent performance consistency');
+  if(podiums>=2)strengths.push(`${podiums} podium finishes show strong tournament competitiveness`);
+  if(momentumScore(p)>=60)strengths.push('Positive current momentum');
+  if(Number(p.winRate||0)>=50)strengths.push('Winning record across verified matches');
+  if(!strengths.length)strengths.push('Building a reliable competitive foundation');
+  if(wins===0&&podiums>0)next.push('Convert podium finishes into a first championship');
+  if(Number(p.clutch||0)<65)next.push('Improve execution in close and high-pressure matches');
+  if(momentumScore(p)<60)next.push('Build stronger recent-form momentum');
+  if(Number(p.versatility||0)<65)next.push('Develop effectiveness with a wider range of partners');
+  if(!next.length)next.push('Maintain current form and target consistent top-three finishes');
+  const outlook=momentumScore(p)>=70?'Strong podium potential':momentumScore(p)>=50?'Competitive upper-half potential':'Development phase with upside';
+  return {strengths:strengths.slice(0,3),next:next.slice(0,3),outlook};
+}
 function historicalAnalyticsDashboard(p){
-  const c=p.careerAnalytics,t=Array.isArray(p.analyticsTimeline)?p.analyticsTimeline:[];
-  if(!c)return `<section class="score-panel panel analytics-dashboard pending"><div class="panel-head"><h3>Career Analytics Dashboard</h3>${badge('Phase 3.3B')}</div><div class="data-status pending"><span>◷</span><div><b>Historical analytics unavailable</b><p>The scorecard is using its current-data fallback. Confirm Phase 3.3A and Supabase access, then reload.</p></div></div></section>`;
-  const cards=[
-    ['Current Rank',`#${c.current_rank}`],['Rank Movement',analyticsMovement(c.rank_change)],['Official Rating',Number(c.current_official_rating||0).toFixed(2)],['Rating Change',`${Number(c.rating_change||0)>0?'+':''}${Number(c.rating_change||0).toFixed(2)}`],
-    ['Career Best',`#${c.best_rank_ever}`],['Average Rank',Number(c.average_rank||0).toFixed(2)],['Tournament Top 3 Rate',`${Number(p.tournamentTop3Rate||0).toFixed(1)}%`],['Career Trend',Number(c.career_trend_score||0).toFixed(1)]
-  ];
+  const c=p.careerAnalytics,t=Array.isArray(p.analyticsTimeline)?p.analyticsTimeline:[],h=verifiedHistory(p);
+  if(!c)return `<section class="score-panel panel analytics-dashboard pending"><div class="panel-head"><h3>Player Intelligence Dashboard</h3>${badge('Phase 3.4A')}</div><div class="data-status pending"><span>◷</span><div><b>Historical analytics unavailable</b><p>Confirm Phase 3.3A and Supabase access, then reload.</p></div></div></section>`;
+  const appearances=Math.max(Number(p.tournamentAppearanceCount||0),h.length);
+  const champions=h.filter(x=>Number(x.rank)===1).length;
+  const runners=h.filter(x=>Number(x.rank)===2).length;
+  const thirds=h.filter(x=>Number(x.rank)===3).length;
+  const podiums=h.length?(champions+runners+thirds):Number(p.tournamentTop3Count||0);
+  const finishes=h.map(x=>Number(x.rank)).filter(Number.isFinite);
+  const avgFinish=finishes.length?(finishes.reduce((a,b)=>a+b,0)/finishes.length).toFixed(1):'—';
+  const bestFinish=finishes.length?Math.min(...finishes):null;
+  const worstFinish=finishes.length?Math.max(...finishes):null;
   const labels=t.map((x,i)=>`S${Number(x.player_snapshot_number||i+1)}`);
-  const history=t.length?`<div class="analytics-charts"><div><h4>Ranking History</h4>${profileChart(t.map(x=>-Number(x.rank)),labels,'Historical ranking progression')}<p class="chart-note">Higher on the chart means a better rank.</p></div><div><h4>Official Rating History</h4>${profileChart(t.map(x=>Number(x.official_rating||0)),labels,'Official rating history')}</div></div>`:`<div class="data-status pending"><span>◷</span><div><b>Timeline pending</b><p>The next committed tournament will add another historical point automatically.</p></div></div>`;
-  return `<section class="score-panel panel analytics-dashboard"><div class="panel-head"><div><h3>Career Analytics Dashboard</h3><small class="analytics-subtitle">Historical ranking and rating engine</small></div><span class="status-chip">${escapeHtml(analyticsTrendLabel(c.career_status))}</span></div><div class="analytics-kpi-grid">${cards.map(([k,v])=>`<div><small>${escapeHtml(k)}</small><strong>${escapeHtml(v)}</strong></div>`).join('')}</div><div class="analytics-achievements"><span>🏆 Best #${c.best_rank_ever}</span><span>🏅 ${Number(p.tournamentTop3Count||0)} podium${Number(p.tournamentTop3Count||0)===1?'':'s'} / ${Number(p.tournamentAppearanceCount||0)} tournaments</span><span>👑 ${Number(c.number_one_snapshots||0)} No.1 snapshots</span><span>📈 ${escapeHtml(analyticsTrendLabel(c.trend_status))}</span><span>🗂 ${Number(c.snapshot_count||0)} snapshots</span></div>${history}</section>`;
+  const badges=intelligenceBadges(p,h,c);
+  const coach=careerCoach(p,h,c);
+  const history=t.length?`<div class="analytics-charts"><div><h4>Ranking History</h4>${profileChart(t.map(x=>-Number(x.rank)),labels,'Historical ranking progression')}<p class="chart-note">Higher means a better rank.</p></div><div><h4>Official Rating History</h4>${profileChart(t.map(x=>Number(x.official_rating||0)),labels,'Official rating history')}</div></div>`:`<div class="data-status pending"><span>◷</span><div><b>Historical charts are ready</b><p>The next committed tournament will add another official snapshot automatically.</p></div></div>`;
+  const journey=h.length?`<div class="journey-track">${h.map((x,i)=>{const prev=i?h[i-1]:null;const move=prev?Number(prev.rank)-Number(x.rank):0;return `<div class="journey-stop"><span class="journey-dot">${placementIcon(x.rank)}</span><small>${escapeHtml(x.label)}</small><strong>#${x.rank}</strong><em class="${move>0?'up':move<0?'down':''}">${i===0?'Start':move>0?`▲ ${move}`:move<0?`▼ ${Math.abs(move)}`:'—'}</em></div>`}).join('')}</div>`:`<div class="data-status pending"><span>◷</span><div><b>Tournament Journey pending</b><p>Import verified tournament standings to activate the career journey.</p></div></div>`;
+  return `<section class="player-intelligence-shell">
+    <div class="intelligence-header"><div><span class="eyebrow">Phase 3.4A</span><h2>Player Intelligence Dashboard</h2><p>A modern career view combining achievements, journey, history, and coaching insight.</p></div><span class="status-chip">${escapeHtml(analyticsTrendLabel(c.career_status))}</span></div>
+    <section class="career-summary panel"><div class="section-heading"><div><span>01</span><h3>Career Summary</h3></div>${badge('Verified + Live')}</div><div class="career-summary-grid">
+      ${[['🏆','Championships',champions],['🥈','Runner-up',runners],['🥉','Third Place',thirds],['🏅','Total Podiums',podiums],['🎾','Tournaments',appearances],['🏟','Matches',p.matches],['📊','Win Rate',pct(p.winRate)],['🎖','Top 3 Rate',`${Number(p.tournamentTop3Rate||0).toFixed(1)}%`],['📍','Average Finish',avgFinish],['⭐','Best Finish',bestFinish?`#${bestFinish}`:'—'],['📉','Worst Finish',worstFinish?`#${worstFinish}`:'—'],['📈','Official Rating',Number(c.current_official_rating||0).toFixed(2)]].map(([i,k,v])=>`<div class="career-stat"><span>${i}</span><div><small>${k}</small><strong>${v}</strong></div></div>`).join('')}
+    </div></section>
+    <section class="intelligence-grid"><div class="panel intelligence-section"><div class="section-heading"><div><span>02</span><h3>Achievement Cabinet</h3></div>${badge(`${badges.length} active`)}</div><div class="achievement-cabinet">${badges.map(([i,n])=>`<div><span>${i}</span><strong>${escapeHtml(n)}</strong></div>`).join('')||'<p class="muted">Achievements will unlock as verified tournament history grows.</p>'}</div></div>
+    <div class="panel intelligence-section"><div class="section-heading"><div><span>03</span><h3>Career Position</h3></div>${badge('Official')}</div><div class="career-position-grid">${[['Current Rank',`#${c.current_rank}`],['Career Best',`#${c.best_rank_ever}`],['Average Rank',Number(c.average_rank||0).toFixed(2)],['Rank Movement',analyticsMovement(c.rank_change)],['Rating Change',`${Number(c.rating_change||0)>0?'+':''}${Number(c.rating_change||0).toFixed(2)}`],['Career Trend',Number(c.career_trend_score||0).toFixed(1)]].map(([k,v])=>`<div><small>${k}</small><strong>${v}</strong></div>`).join('')}</div></div></section>
+    <section class="panel intelligence-section"><div class="section-heading"><div><span>04</span><h3>Tournament Journey</h3></div>${badge('Career timeline')}</div>${journey}</section>
+    <section class="panel intelligence-section"><div class="section-heading"><div><span>05</span><h3>Historical Performance</h3></div>${badge(`${Number(c.snapshot_count||0)} snapshots`)}</div>${history}</section>
+    <section class="ai-coach panel"><div class="section-heading"><div><span>06</span><h3>FLPR AI Coach</h3></div>${badge('Data-driven')}</div><div class="coach-grid"><div><h4>Strengths</h4><ul>${coach.strengths.map(x=>`<li>✓ ${escapeHtml(x)}</li>`).join('')}</ul></div><div><h4>Next Targets</h4><ul>${coach.next.map(x=>`<li>→ ${escapeHtml(x)}</li>`).join('')}</ul></div><div class="coach-outlook"><small>Next Tournament Outlook</small><strong>${escapeHtml(coach.outlook)}</strong><p>Generated from rating, momentum, consistency, verified finishes, and current match statistics.</p></div></div></section>
+  </section>`;
 }
 
 function scorecardDirectory(){const players=DATA.players.slice().sort((a,b)=>a.name.localeCompare(b.name));return `${title('Player Scorecards','Select any player to open the complete individual analytics report.')}<div class="search-box"><input id="scorecardSearch" class="input" placeholder="Search player name…" aria-label="Search player name"></div><div class="directory-hint">Tap any player card <b>❯</b></div><div class="scorecard-directory" id="scorecardDirectory">${players.map(p=>`<a class="scorecard-select-card" href="#scorecard/${encodeURIComponent(p.slug)}">${avatarImg(p.name,'',p.name)}<div class="scorecard-select-main"><strong>${escapeHtml(p.name)}</strong><span>Rank #${p.rank} · ${escapeHtml(p.status)}</span></div><div class="scorecard-select-metrics"><b>${p.rating.toFixed(2)}</b><span>Rating</span></div><div class="scorecard-select-metrics"><b>${p.consistency.toFixed(1)}</b><span>Consistency</span></div><div class="scorecard-select-metrics"><b>${momentumScore(p).toFixed(1)}</b><span>Momentum</span></div><span class="scorecard-select-arrow" aria-hidden="true">❯</span></a>`).join('')}</div>`;}
