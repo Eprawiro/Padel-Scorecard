@@ -78,7 +78,7 @@ window.FLPR_LIVE = (() => {
     try{
       // Load every tournament standing, not only the top three. The complete
       // set is required to calculate tournament total and average points.
-      const tpcols='tournament_id,final_position,total_points,players(display_name)';
+      const tpcols='tournament_id,player_id,final_position,total_points,players(display_name)';
       entries=await rest(`tournament_players?select=${encodeURIComponent(tpcols)}&order=final_position.asc`);
     }catch(error){ console.warn('Tournament standings query unavailable',error); }
     return tournaments.map((t,index)=>{
@@ -102,7 +102,14 @@ window.FLPR_LIVE = (() => {
         players:playerCount,rounds:num(t.round_count),matches:num(t.match_count),
         totalPoints,
         averagePoints:playerCount ? totalPoints/playerCount : null,
-        podium,status:'Published · Live Supabase',sourceUrl:t.source_url,live:true
+        podium,
+        standings:standings.map(x=>({
+          playerId:x.player_id,
+          name:x.players?.display_name||'Player',
+          finalPosition:num(x.final_position,999),
+          totalPoints:num(x.total_points)
+        })),
+        status:'Published · Live Supabase',sourceUrl:t.source_url,live:true
       };
     });
   }
@@ -137,6 +144,19 @@ window.FLPR_LIVE = (() => {
           player.ratingChange={...(player.ratingChange||{}),delta:num(analytics.summary.rating_change),previousRank:num(analytics.summary.previous_historical_rank,player.rank),currentRank:player.rank,rankMovement:num(analytics.summary.rank_change),event:'Historical Analytics Engine'};
         }
       }
+
+      // Phase 3.3C: Tournament Top-3 Rate must be based on verified final
+      // tournament standings, not on ranking-history snapshots.
+      const appearances=tournaments.filter(t=>Array.isArray(t.standings) && t.standings.some(x=>x.playerId===player.id));
+      const podiumFinishes=appearances.filter(t=>t.standings.some(x=>x.playerId===player.id && x.finalPosition<=3)).length;
+      const tournamentTopThreeRate=appearances.length ? podiumFinishes/appearances.length*100 : 0;
+      player.careerAnalytics={
+        ...(player.careerAnalytics||{}),
+        tournament_appearances:appearances.length,
+        tournament_podiums:podiumFinishes,
+        top_three_rate:tournamentTopThreeRate,
+        top_three_rate_basis:'verified tournament final standings'
+      };
     }
     const kpis={...(snapshot.kpis||{})};
     kpis.Players=players.length;
@@ -147,7 +167,7 @@ window.FLPR_LIVE = (() => {
     kpis['Average Rating']=players.length?Number((players.reduce((a,p)=>a+p.rating,0)/players.length).toFixed(2)):0;
     return {
       ...snapshot,
-      meta:{...(snapshot.meta||{}),version:'3.3B Player Analytics Dashboard',dataMode:'LIVE SUPABASE + HISTORICAL ANALYTICS',sourceWorkbook:'Supabase live database (advanced analytics fallback from Phase 2.2C snapshot)',liveLoadedAt:new Date().toISOString()},
+      meta:{...(snapshot.meta||{}),version:'3.3C Analytics Bug Fix & Validation',dataMode:'LIVE SUPABASE + HISTORICAL ANALYTICS',sourceWorkbook:'Supabase live database (advanced analytics fallback from Phase 2.2C snapshot)',liveLoadedAt:new Date().toISOString()},
       kpis,players,
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
       live:{ok:true,players:players.length,tournaments:tournaments.length,loadedAt:new Date().toISOString()},
