@@ -145,7 +145,7 @@ window.FLPR_LIVE = (() => {
       }
       // Tournament Top-3 rate must use verified final standings, not ranking snapshots
       // and not player_statistics.podiums (which can represent a different aggregate).
-      const finishHistory=tournaments.map(t=>{
+      const finishHistory=tournaments.map((t,index)=>{
         if(!Array.isArray(t.standings)) return null;
         const standing=t.standings.find(s=>s.playerId===player.id);
         if(!standing || !Number.isFinite(Number(standing.finalPosition)) || Number(standing.finalPosition)<1) return null;
