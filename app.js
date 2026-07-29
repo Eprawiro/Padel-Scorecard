@@ -185,7 +185,10 @@ Object.assign(STAT_INFO, {
   'prediction-confidence': {title:'Prediction Confidence',definition:'The evidence-strength category attached to a prediction.',formula:'High: Confidence Score ≥80; Medium: 50–79.9; Low: below 50.',interpretation:'Confidence describes reliability of the outlook, not player strength.'},
   'prediction-band': {title:'Outlook Band',definition:'A plain-language category derived from the Prediction Readiness Index.',formula:'Strong Contender ≥70; Podium Watch 60–69.9; Competitive 50–59.9; Development Outlook below 50.',interpretation:'Bands are directional summaries and must not be interpreted as guaranteed finishing positions.'},
   'prediction-top3-input': {title:'Verified Top-3 Rate Input',definition:'The share of verified tournament appearances ending in first, second, or third place.',formula:'Verified podium finishes ÷ verified tournament appearances × 100.',interpretation:'This input rewards demonstrated tournament conversion while retaining confidence controls for small samples.'},
-  'prediction-emerging-watch': {title:'Emerging Watch',definition:'The strongest current prediction outlook among players who are not yet eligible for the Official Ranking group.',formula:'Provisional players are scored by the same formula but displayed separately from eligible Top Contenders.',interpretation:'This keeps promising new players visible without presenting a limited sample as an established prediction.'}
+  'prediction-emerging-watch': {title:'Emerging Watch',definition:'The strongest current prediction outlook among players who are not yet eligible for the Official Ranking group.',formula:'Provisional players are scored by the same formula but displayed separately from eligible Top Contenders.',interpretation:'This keeps promising new players visible without presenting a limited sample as an established prediction.'},
+  'prediction-validation': {title:'Model Validation Status',definition:'Automated checks confirming that prediction inputs are finite, scores remain within 0–100, and eligible players stay separate from Provisional/Emerging players.',formula:'PASS requires valid inputs, bounded outputs, zero eligibility overlap, and a complete model result for every active player.',interpretation:'Validation confirms model integrity; it does not guarantee prediction accuracy.'},
+  'prediction-freshness': {title:'Prediction Data Freshness',definition:'The most recent verified tournament date available to the Prediction Engine.',formula:'Latest date among published verified tournaments loaded from the live database.',interpretation:'Predictions should be reviewed after every new tournament import.'},
+  'prediction-contribution': {title:'Weighted Factor Contribution',definition:'How much each performance factor contributes to the Performance Blend before confidence adjustment.',formula:'Rating × 40%; Momentum × 25%; Consistency × 15%; verified Top-3 Rate × 20%.',interpretation:'The bars explain the model; they are not independent probabilities.'}
 });
 function infoButton(key){const item=STAT_INFO[key];return item?`<button class="info-button" type="button" data-info="${escapeHtml(key)}" aria-label="Information about ${escapeHtml(item.title)}">i</button>`:'';}
 function parameterLabel(label,key){return `<span class="parameter-label"><span>${escapeHtml(label)}</span>${infoButton(key)}</span>`;}
@@ -489,7 +492,8 @@ function predictionModel(p){
   const performance=(rating*.40)+(momentum*.25)+(consistency*.15)+(top3Rate*.20);
   const reliability=.55+(.45*confidence/100);
   const readiness=Math.max(0,Math.min(100,50+((performance-50)*reliability)));
-  return {rating,momentum,consistency,top3Rate,confidence,performance,reliability,readiness};
+  const contributions={rating:rating*.40,momentum:momentum*.25,consistency:consistency*.15,top3Rate:top3Rate*.20};
+  return {rating,momentum,consistency,top3Rate,confidence,performance,reliability,readiness,contributions};
 }
 function predictionBand(score){return score>=70?['Strong Contender','strong']:score>=60?['Podium Watch','watch']:score>=50?['Competitive','competitive']:['Development Outlook','development'];}
 function predictionConfidence(score){return score>=80?['High','high']:score>=50?['Medium','medium']:['Low','low'];}
@@ -512,6 +516,27 @@ function predictionTableRow(p,index){
   const m=predictionModel(p),[band,bandClass]=predictionBand(m.readiness),[confidence,confidenceClass]=predictionConfidence(m.confidence);
   return `<a class="prediction-table-row" href="#scorecard/${encodeURIComponent(p.slug)}"><span>${index+1}</span><div>${avatarImg(p.name,'prediction-mini-avatar',p.name)}<strong>${escapeHtml(p.name)}</strong></div><b>${m.readiness.toFixed(1)}</b><em class="outlook-band ${bandClass}">${band}</em><small>${m.rating.toFixed(1)}</small><small>${m.momentum.toFixed(1)}</small><small>${m.consistency.toFixed(1)}</small><small>${m.top3Rate.toFixed(1)}%</small><span class="confidence-dot ${confidenceClass}">${confidence}</span></a>`;
 }
+function predictionFreshness(){
+  const dated=getTournaments().filter(t=>t.players&&t.dateISO).sort((a,b)=>String(b.dateISO).localeCompare(String(a.dateISO)));
+  return dated.length?`${dated[0].date} · ${tournamentDisplayName(dated[0])}`:'Awaiting verified tournament';
+}
+function predictionAudit(modeled,eligible,provisional){
+  const finite=modeled.every(({m})=>['rating','momentum','consistency','top3Rate','confidence','performance','reliability','readiness'].every(k=>Number.isFinite(m[k])));
+  const bounded=modeled.every(({m})=>m.readiness>=0&&m.readiness<=100&&m.confidence>=0&&m.confidence<=100);
+  const overlap=eligible.filter(x=>provisional.some(y=>(x.p.id&&y.p.id&&y.p.id===x.p.id)||y.p.slug===x.p.slug)).length;
+  const complete=modeled.length===DATA.players.length;
+  const checks=[['Input integrity',finite],['Score bounds',bounded],['Eligibility separation',overlap===0],['Player coverage',complete]];
+  return {pass:checks.every(([,ok])=>ok),checks};
+}
+function predictionValidationPanel(modeled,eligible,provisional){
+  const audit=predictionAudit(modeled,eligible,provisional);
+  return `<section class="prediction-validation panel"><div class="prediction-heading"><div><span class="eyebrow">Automated Model Audit</span><h2>Prediction Validation</h2><p>Read-only integrity checks performed on the current model output.</p></div><span class="validation-status ${audit.pass?'pass':'review'}">${audit.pass?'✓ PASS':'! REVIEW'}</span></div><div class="validation-grid">${audit.checks.map(([label,ok])=>`<div class="${ok?'pass':'review'}"><span>${ok?'✓':'!'}</span><div><strong>${escapeHtml(label)}</strong><small>${ok?'Validated':'Needs review'}</small></div></div>`).join('')}</div><div class="freshness-row"><div>${parameterLabel('Latest Verified Data','prediction-freshness')}<strong>${escapeHtml(predictionFreshness())}</strong></div><div>${parameterLabel('Model Coverage','prediction-validation')}<strong>${modeled.length} of ${DATA.players.length} active players</strong></div><div><span>Database Impact</span><strong>Read-only · No changes</strong></div></div></section>`;
+}
+function predictionContributionCard(p,index){
+  const m=predictionModel(p),[band,bandClass]=predictionBand(m.readiness);
+  const factors=[['Official Rating',m.rating,m.contributions.rating,40],['Momentum',m.momentum,m.contributions.momentum,25],['Consistency',m.consistency,m.contributions.consistency,15],['Verified Top-3',m.top3Rate,m.contributions.top3Rate,20]];
+  return `<article class="contribution-card"><div class="contribution-head"><div><span>#${index+1} Eligible Outlook</span><h3>${escapeHtml(p.name)}</h3></div><div><b>${m.readiness.toFixed(1)}</b><em class="outlook-band ${bandClass}">${band}</em></div></div><div class="contribution-bars">${factors.map(([label,input,points,weight])=>`<div><div><span>${escapeHtml(label)} <small>${weight}%</small></span><strong>${input.toFixed(1)} → ${points.toFixed(1)} pts</strong></div><i><b style="width:${Math.max(0,Math.min(100,input))}%"></b></i></div>`).join('')}</div><footer><span>Performance Blend <b>${m.performance.toFixed(1)}</b></span><span>Evidence Reliability <b>${(m.reliability*100).toFixed(1)}%</b></span><span>Final Readiness <b>${m.readiness.toFixed(1)}</b></span></footer></article>`;
+}
 function predictions(){
   const modeled=DATA.players.map(p=>({p,m:predictionModel(p)})).sort((a,b)=>b.m.readiness-a.m.readiness||a.p.rank-b.p.rank);
   const eligible=modeled.filter(x=>isRankingEligible(x.p));
@@ -522,7 +547,9 @@ function predictions(){
   const highConfidence=modeled.filter(x=>x.m.confidence>=80).length;
   return `${title('Prediction Engine','A conservative next-tournament outlook based on verified FLPR performance data.')}
   <section class="prediction-disclaimer panel"><div><span>ⓘ</span><p><strong>Directional analysis—not a guarantee.</strong> Predictions do not change Official Ranking, rating, handicap, eligibility, or tournament records. Partnerships, draws, court conditions, and future opponents are not yet known.</p></div>${infoButton('prediction-readiness')}</section>
+  ${predictionValidationPanel(modeled,eligible,provisional)}
   <section class="prediction-overview panel"><div class="prediction-heading"><div><span class="eyebrow">Next Tournament Outlook</span><h2>Eligible Top Contenders</h2><p>Ranked by Prediction Readiness, separate from Official Ranking.</p></div>${badge(`${eligible.length} eligible`)}</div><div class="prediction-summary">${stats([['Players Analyzed',modeled.length],['Average Readiness',average.toFixed(1)],['High-Confidence Profiles',highConfidence]])}</div><div class="prediction-podium">${contenders.map((x,i)=>predictionCard(x.p,i+1)).join('')}</div></section>
+  <section class="prediction-section panel"><div class="prediction-heading"><div><span class="eyebrow">Transparent Calculation</span><h2>Why These Contenders?</h2><p>Input scores and weighted contributions behind the current eligible top three.</p></div>${parameterLabel('Factor Contribution','prediction-contribution')}</div><div class="contribution-grid">${contenders.map((x,i)=>predictionContributionCard(x.p,i)).join('')}</div></section>
   <section class="prediction-section panel"><div class="panel-head"><div class="panel-title-with-info"><h2>Emerging Watch</h2>${infoButton('prediction-emerging-watch')}</div>${badge('Provisional outlook')}</div>${watch.length?`<div class="emerging-watch">${watch.map((x,i)=>predictionCard(x.p,i+1)).join('')}</div>`:'<div class="notice">No Provisional player outlooks are available.</div>'}</section>
   <section class="prediction-section panel"><div class="prediction-heading"><div><span class="eyebrow">Complete Model</span><h2>Prediction Readiness Table</h2><p>Tap any player to open the supporting scorecard.</p></div>${parameterLabel('Outlook Band','prediction-band')}</div><div class="prediction-table-head"><span>#</span><span>Player</span><span>Readiness</span><span>Outlook</span><span>Rating</span><span>Momentum</span><span>Consistency</span><span>Top-3</span><span>Evidence</span></div><div class="prediction-table">${modeled.map((x,i)=>predictionTableRow(x.p,i)).join('')}</div></section>`;
 }
