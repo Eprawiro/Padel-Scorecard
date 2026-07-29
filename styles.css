@@ -139,3 +139,4 @@
 /* FLPR Phase 4.2C — regression and stabilization */
 .ranking-integrity{margin:0 0 18px}.ranking-integrity ul{margin:10px 0 0;padding-left:20px}.ranking-table-heading{margin-top:22px}.ranking-table-heading .section-title{margin:3px 0 12px}.ranking-table-heading>span{margin-bottom:14px;white-space:nowrap}
 @media(max-width:520px){.ranking-table-heading{align-items:flex-end}.ranking-table-heading .section-title{font-size:1.25rem}.ranking-table-heading>span{font-size:.72rem}}
+.tie-break-cell{color:var(--gold);font-weight:900;white-space:nowrap}
