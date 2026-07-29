@@ -1,5 +1,14 @@
 # FLPR Premium v1.0 — Final Release Notes
 
+## Tournament Intelligence UI Foundation
+
+- Removed technical phase-number labels from every public-facing screen.
+- Replaced displayed Americano UUIDs with readable `JakSel T#` labels.
+- Applied tournament naming consistently to Historical Comparison, Tournament
+  Records, Champion History, Hall of Fame, and player Tournament Journey.
+- Preserved UUIDs and source IDs internally for database integrity and duplicate
+  detection.
+
 ## Phase 4.2C
 
 - Stabilized the Phase 4 Player Intelligence release.

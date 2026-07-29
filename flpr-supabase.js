@@ -99,7 +99,7 @@ window.FLPR_LIVE = (() => {
         id:t.source_tournament_id || `T${index+1}`,
         sourceTournamentId:t.source_tournament_id,
         uuid:t.id,
-        name:t.name,
+        name:t.name || `JakSel T${index+1}`,
         date:fmtDate(t.published_at||t.imported_at),
         dateISO:String(t.published_at||t.imported_at||'').slice(0,10),
         location:'Jakarta Selatan',format:'Americano',
@@ -152,7 +152,7 @@ window.FLPR_LIVE = (() => {
         return {
           tournamentId:t.id,
           tournamentUuid:t.uuid,
-          label:t.id,
+          label:t.name || `JakSel T${index+1}`,
           name:t.name,
           date:t.date,
           dateISO:t.dateISO,
@@ -181,7 +181,7 @@ window.FLPR_LIVE = (() => {
     kpis['Average Rating']=players.length?Number((players.reduce((a,p)=>a+p.rating,0)/players.length).toFixed(2)):0;
     return {
       ...snapshot,
-      meta:{...(snapshot.meta||{}),version:'3.4A.2 Tournament Finish Integrity Fix',dataMode:'LIVE SUPABASE + HISTORICAL ANALYTICS',sourceWorkbook:'Supabase live database (advanced analytics fallback from Phase 2.2C snapshot)',liveLoadedAt:new Date().toISOString()},
+      meta:{...(snapshot.meta||{}),version:'Tournament Intelligence',dataMode:'LIVE SUPABASE + HISTORICAL ANALYTICS',sourceWorkbook:'Supabase live database with approved analytics fallback',liveLoadedAt:new Date().toISOString()},
       kpis,players,
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
       live:{ok:true,players:players.length,tournaments:tournaments.length,loadedAt:new Date().toISOString()},
