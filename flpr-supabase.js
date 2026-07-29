@@ -31,7 +31,7 @@ window.FLPR_LIVE = (() => {
     const losses=num(s.losses, snapshot?.losses||0);
     const draws=num(s.draws,0);
     const winRate=s.win_rate==null ? (matches?wins/matches*100:0) : pctFromDb(s.win_rate);
-    const rating=num(row.rating, snapshot?.rating||0);
+    const rating=num(s.official_rating, row.rating ?? snapshot?.rating ?? 0);
     const rank=num(s.rank, snapshot?.rank||999);
     const previousRank=num(s.previous_rank,rank);
     const pd=num(s.total_points_for)-num(s.total_points_against);
@@ -46,8 +46,12 @@ window.FLPR_LIVE = (() => {
       rating,
       handicap:num(row.handicap, snapshot?.handicap||0),
       tournaments:num(row.tournaments_played ?? s.tournaments_played,0),
-      provisional:Boolean(row.provisional),
-      status:row.provisional?'Provisional':'Established',
+      provisional:!Boolean(s.ranking_eligible),
+      status:String(s.player_status || (row.provisional?'PROVISIONAL':'ESTABLISHED')).toUpperCase(),
+      playerStatus:String(s.player_status || (row.provisional?'PROVISIONAL':'ESTABLISHED')).toUpperCase(),
+      rankingEligible:s.ranking_eligible == null ? !Boolean(row.provisional) : Boolean(s.ranking_eligible),
+      confidenceScore:Number(num(s.confidence_score, snapshot?.confidenceScore||0).toFixed(1)),
+      officialRating:rating,
       consistency:Number((num(s.consistency, (snapshot?.consistency||0)/100)*100).toFixed(1)),
       dominance:Number((s.dominance==null ? snapshot?.dominance||0 : num(s.dominance)).toFixed(1)),
       recentForm:Number((num(s.momentum, snapshot?.recentForm||0)).toFixed(1)),
@@ -66,7 +70,7 @@ window.FLPR_LIVE = (() => {
     };
   }
   async function loadPlayers(snapshotPlayers=[]){
-    const select='id,display_name,slug,rating,handicap,tournaments_played,provisional,status,player_statistics(rank,previous_rank,tournaments_played,matches_played,wins,draws,losses,win_rate,total_points_for,total_points_against,average_points,momentum,consistency,dominance,championships,podiums)';
+    const select='id,display_name,slug,rating,handicap,tournaments_played,provisional,status,player_statistics(rank,previous_rank,tournaments_played,matches_played,wins,draws,losses,win_rate,total_points_for,total_points_against,average_points,momentum,consistency,dominance,championships,podiums,official_rating,confidence_score,player_status,ranking_eligible)';
     const rows=await rest(`players?select=${encodeURIComponent(select)}&status=eq.active&order=rating.desc`);
     const bySlug=new Map(snapshotPlayers.map(p=>[p.slug,p]));
     return rows.map(r=>mergePlayer(r,bySlug.get(r.slug)));
