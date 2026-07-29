@@ -184,14 +184,26 @@ function rankingRow(p){
 }
 
 function eliteRankingPodium(players){
-  const top=players.slice(0,3);
-  if(top.length<3)return '';
+  const top=players.filter(isRankingEligible).slice(0,3);
+  if(top.length<3)return `<section class="elite-ranking"><div class="elite-heading"><div><span class="eyebrow">Elite Top 3</span><h2>Official Ranking Podium</h2></div>${parameterLabel('Rank Movement','rank-movement')}</div><div class="notice">The Official Top 3 will appear when at least three eligible players are available.</div></section>`;
   const order=[1,0,2];
   return `<section class="elite-ranking"><div class="elite-heading"><div><span class="eyebrow">Elite Top 3</span><h2>Official Ranking Podium</h2></div>${parameterLabel('Rank Movement','rank-movement')}</div><div class="elite-podium">${order.map(i=>{const p=top[i];const place=i+1;return `<a class="elite-card place-${place}" href="#scorecard/${encodeURIComponent(p.slug)}"><span class="elite-medal">${place===1?'🥇':place===2?'🥈':'🥉'}</span>${avatarImg(p.name,'elite-avatar',p.name)}<strong>${escapeHtml(p.name)}</strong><small>${officialStatusBadge(p)}${playerStatusBadge(p)}</small><b>${Number(p.officialRating??p.rating??0).toFixed(2)}</b><em>Official Rating</em><span class="elite-movement ${movementClass(p)}">${movementText(p)}</span><div class="elite-base">${place}</div></a>`;}).join('')}</div></section>`;
 }
 
 function rankingCriteria(){
   return `<details class="ranking-criteria panel"><summary><span><small class="eyebrow">Transparent Methodology</small><strong>Official Ranking Criteria</strong></span>${infoButton('official-ranking-criteria')}<b>View criteria</b></summary><div class="criteria-grid"><div><span>01</span><strong>Verified Results</strong><p>Only approved tournament and match records feed the official engine.</p></div><div><span>02</span><strong>Performance Strength</strong><p>Official Rating represents demonstrated performance; rank is the relative order.</p></div><div><span>03</span><strong>Participation & Confidence</strong><p>Sample size increases rating reliability. Confidence is not a measure of playing strength.</p></div><div><span>04</span><strong>Provisional Protection</strong><p>A strong newcomer remains visible but may stay Provisional until eligibility requirements are met.</p></div><div><span>05</span><strong>Automatic Recalculation</strong><p>Tournaments played and player statistics are rebuilt from clean data—not manually edited.</p></div><div><span>06</span><strong>Approved Movement</strong><p>▲ and ▼ compare consecutive verified ranking snapshots; no history displays a neutral dash.</p></div></div></details>`;
+}
+
+function rankingIntegrity(players){
+  const issues=[];
+  const ranked=players.slice().sort((a,b)=>a.rank-b.rank);
+  const ranks=ranked.map(p=>Number(p.rank));
+  if(ranks.some((rank,index)=>!Number.isFinite(rank)||(index>0&&rank<=ranks[index-1])))issues.push('Rank values are missing, duplicated, or not strictly increasing.');
+  const firstProvisional=ranked.findIndex(p=>!isRankingEligible(p));
+  if(firstProvisional>=0&&ranked.slice(firstProvisional+1).some(isRankingEligible))issues.push('An Official player appears below a Provisional player.');
+  if(ranked.some(p=>!Number.isFinite(Number(p.officialRating??p.rating))))issues.push('One or more players are missing an Official Rating.');
+  if(ranked.some(p=>!Number.isFinite(Number(p.confidenceScore))))issues.push('One or more players are missing a Confidence Score.');
+  return issues;
 }
 
 function home(){
@@ -238,7 +250,9 @@ function scoreboard(){
 
 function ranking(){
   const ranked=DATA.players.slice().sort((a,b)=>a.rank-b.rank);
-  return `${title('FLPR Ranking','Official rating, eligibility, player development status, confidence, and movement.')}${eliteRankingPodium(ranked)}<section class="ranking-status-legend panel"><div class="legend-heading"><div><span class="eyebrow">Phase 4 Official Ranking</span><h2>Ranking Status Guide</h2></div>${infoButton('official-ranking-status')}</div><div class="legend-badges"><div>${'<span class="ranking-badge official">🏆 Official</span>'}<small>Eligible for the official ranking group</small></div><div>${'<span class="ranking-badge player-status established">★ Established</span>'}<small>Strongest participation history</small></div><div>${'<span class="ranking-badge player-status emerging">● Emerging</span>'}<small>Rating reliability is developing</small></div><div>${'<span class="ranking-badge provisional">◷ Provisional</span>'}<small>Visible rating; eligibility still developing</small></div></div><div class="legend-help">${parameterLabel('Official Rating','official-rating')}${parameterLabel('Confidence Score','confidence-score')}${parameterLabel('Player Status','player-status')}${parameterLabel('Rank Movement','rank-movement')}${parameterLabel('Handicap','handicap')}</div></section>${rankingCriteria()}<div class="ranking-list">${ranked.map(rankingRow).join('')}</div>`;
+  const issues=rankingIntegrity(ranked);
+  const integrity=issues.length?`<div class="error ranking-integrity"><strong>Ranking data integrity warning</strong><ul>${issues.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></div>`:'';
+  return `${title('FLPR Ranking','Official rating, eligibility, player development status, confidence, and movement.')}${integrity}${eliteRankingPodium(ranked)}<section class="ranking-status-legend panel"><div class="legend-heading"><div><span class="eyebrow">Phase 4 Official Ranking</span><h2>Ranking Status Guide</h2></div>${infoButton('official-ranking-status')}</div><div class="legend-badges"><div>${'<span class="ranking-badge official">🏆 Official</span>'}<small>Eligible for the official ranking group</small></div><div>${'<span class="ranking-badge player-status established">★ Established</span>'}<small>Strongest participation history</small></div><div>${'<span class="ranking-badge player-status emerging">● Emerging</span>'}<small>Rating reliability is developing</small></div><div>${'<span class="ranking-badge provisional">◷ Provisional</span>'}<small>Visible rating; eligibility still developing</small></div></div><div class="legend-help">${parameterLabel('Official Rating','official-rating')}${parameterLabel('Confidence Score','confidence-score')}${parameterLabel('Player Status','player-status')}${parameterLabel('Rank Movement','rank-movement')}${parameterLabel('Handicap','handicap')}</div></section>${rankingCriteria()}<div class="section-heading ranking-table-heading"><div><span class="eyebrow">Complete Field</span><h2 class="section-title">Official & Provisional Ranking</h2></div><span class="muted">${ranked.length} active players</span></div><div class="ranking-list">${ranked.map(rankingRow).join('')}</div>`;
 }
 
 function metricBar(label,value,caption='',infoKey=''){
