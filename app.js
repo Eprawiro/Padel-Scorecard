@@ -2,7 +2,7 @@
 
 const ROUTES = [
   ['home','Home'],['tournaments','Tournament Center'],['scoreboard','Full Scoreboard'],['ranking','Ranking'],
-  ['scorecard','Player Scorecards'],['halloffame','Hall of Fame'],['statistics','Statistics'],['import','Data Import'],
+  ['scorecard','Player Scorecards'],['halloffame','Hall of Fame'],['statistics','Statistics'],['predictions','Predictions'],['import','Data Import'],
   ['about','About FLPR'],['appendix','Appendix & Definitions']
 ];
 
@@ -177,6 +177,14 @@ Object.assign(STAT_INFO, {
   'closest-finish': {title:'Closest Point Finish',definition:'The smallest non-negative champion-points difference to the runner-up.',formula:'MIN(champion points − runner-up points), excluding events where official standings—not points alone—decided the champion.',interpretation:'A smaller value indicates a tighter points finish. Official tie-break events are tracked separately.'},
   'official-tiebreak-events': {title:'Official Tie-break Events',definition:'Tournaments where the official champion had fewer total points than the runner-up but remained first under the official standings criteria.',formula:'COUNT(events where champion points − runner-up points < 0).',interpretation:'This is not a data error. It means total points alone did not determine the official winner.'},
   'finish-profile': {title:'Finish Profile',definition:'A plain-language classification of how the official result was decided.',formula:'Negative point gap: Official Tie-break; 0–1: Photo Finish; 2–3: Close Finish; 4 or more: Clear Win.',interpretation:'This describes the tournament finish only and does not affect player rating or ranking.'}
+});
+Object.assign(STAT_INFO, {
+  'prediction-readiness': {title:'Prediction Readiness Index',definition:'A conservative directional index for the next tournament based on current verified performance evidence.',formula:'Performance Blend = 40% Official Rating + 25% Momentum + 15% Consistency + 20% verified Top-3 Rate. Final Index = 50 + (Performance Blend − 50) × (0.55 + 0.45 × Confidence ÷ 100).',interpretation:'Higher indicates a stronger current outlook. It is not a win probability and does not guarantee a result.'},
+  'prediction-performance-blend': {title:'Performance Blend',definition:'The performance-only component of the prediction before confidence adjustment.',formula:'40% Official Rating + 25% Momentum + 15% Consistency + 20% verified Top-3 Rate.',interpretation:'This combines current strength, form, stability, and verified tournament conversion.'},
+  'prediction-confidence': {title:'Prediction Confidence',definition:'The evidence-strength category attached to a prediction.',formula:'High: Confidence Score ≥80; Medium: 50–79.9; Low: below 50.',interpretation:'Confidence describes reliability of the outlook, not player strength.'},
+  'prediction-band': {title:'Outlook Band',definition:'A plain-language category derived from the Prediction Readiness Index.',formula:'Strong Contender ≥70; Podium Watch 60–69.9; Competitive 50–59.9; Development Outlook below 50.',interpretation:'Bands are directional summaries and must not be interpreted as guaranteed finishing positions.'},
+  'prediction-top3-input': {title:'Verified Top-3 Rate Input',definition:'The share of verified tournament appearances ending in first, second, or third place.',formula:'Verified podium finishes ÷ verified tournament appearances × 100.',interpretation:'This input rewards demonstrated tournament conversion while retaining confidence controls for small samples.'},
+  'prediction-emerging-watch': {title:'Emerging Watch',definition:'The strongest current prediction outlook among players who are not yet eligible for the Official Ranking group.',formula:'Provisional players are scored by the same formula but displayed separately from eligible Top Contenders.',interpretation:'This keeps promising new players visible without presenting a limited sample as an established prediction.'}
 });
 function infoButton(key){const item=STAT_INFO[key];return item?`<button class="info-button" type="button" data-info="${escapeHtml(key)}" aria-label="Information about ${escapeHtml(item.title)}">i</button>`:'';}
 function parameterLabel(label,key){return `<span class="parameter-label"><span>${escapeHtml(label)}</span>${infoButton(key)}</span>`;}
@@ -464,6 +472,53 @@ function statistics(){
   return `${title('Statistics Center','Leaderboards and performance indicators generated from the workbook dataset. Tap the information icon for the definition and interpretation of each parameter.')}${kpis}<div class="leaderboard-grid">${board('Top Movers',improved,p=>movementText(p),'Official snapshot movement','top-movers')}${board('Momentum Leaders',momentum,p=>momentumScore(p).toFixed(1),'Composite momentum','momentum-leaders')}${board('Most Consistent',consistent,p=>p.consistency.toFixed(1),'Consistency index','most-consistent')}${board('Highest Win Rate',win,p=>pct(p.winRate),'Minimum 6 matches','highest-win-rate')}${board('Most Dominant',dominant,p=>p.dominance.toFixed(1),'Dominance index','most-dominant')}${board('Clutch Leaders',clutch,p=>p.clutch.toFixed(1),'Clutch index','clutch-leaders')}${board('Most Versatile',versatile,p=>p.versatility.toFixed(1),'Partner versatility','most-versatile')}${board('Toughest Schedule',tough,p=>p.sos.toFixed(1),'Schedule strength','toughest-schedule')}${board('Best Partner Chemistry',partnerChemistry,p=>`${p.analysis.bestPartner.name} · +${Number(p.analysis.bestPartner.chemistryDelta||0).toFixed(1)}`,'Strongest partnership effect','best-partner-chemistry')}${board('Toughest Opponent',toughestOpponent,p=>`${p.analysis.hardestOpponent.name} · ${pct(p.analysis.hardestOpponent.winRate)}`,'Hardest head-to-head matchup','toughest-opponent')}</div><div class="notice"><strong>Data note:</strong> Top Movers uses approved snapshot-to-snapshot movement. The current workbook is the production baseline, so movement becomes meaningful after the next verified tournament import. Partner and opponent categories use the relationship data currently available in each player scorecard.</div>`;
 }
 
+function predictionModel(p){
+  const rating=Math.max(0,Math.min(100,Number(p.officialRating??p.rating??0)));
+  const momentum=Math.max(0,Math.min(100,momentumScore(p)));
+  const consistency=Math.max(0,Math.min(100,Number(p.consistency||0)));
+  const top3Rate=Math.max(0,Math.min(100,Number(p.tournamentTop3Rate||0)));
+  const confidence=Math.max(0,Math.min(100,Number(p.confidenceScore||0)));
+  const performance=(rating*.40)+(momentum*.25)+(consistency*.15)+(top3Rate*.20);
+  const reliability=.55+(.45*confidence/100);
+  const readiness=Math.max(0,Math.min(100,50+((performance-50)*reliability)));
+  return {rating,momentum,consistency,top3Rate,confidence,performance,reliability,readiness};
+}
+function predictionBand(score){return score>=70?['Strong Contender','strong']:score>=60?['Podium Watch','watch']:score>=50?['Competitive','competitive']:['Development Outlook','development'];}
+function predictionConfidence(score){return score>=80?['High','high']:score>=50?['Medium','medium']:['Low','low'];}
+function predictionReasons(p,m){
+  const factors=[
+    ['Official Rating',m.rating],
+    ['Momentum',m.momentum],
+    ['Consistency',m.consistency],
+    ['Verified Top-3 Rate',m.top3Rate]
+  ].sort((a,b)=>b[1]-a[1]);
+  const positives=factors.filter(([,v])=>v>=60).slice(0,2).map(([name])=>name);
+  const constraint=m.confidence<50?'limited evidence':m.top3Rate===0?'no verified podium conversion yet':m.momentum<50?'current momentum below neutral':'balanced evidence profile';
+  return {positives:positives.length?positives:['developing profile'],constraint};
+}
+function predictionCard(p,place){
+  const m=predictionModel(p),[band,bandClass]=predictionBand(m.readiness),[confidence,confidenceClass]=predictionConfidence(m.confidence),reason=predictionReasons(p,m);
+  return `<a class="prediction-card place-${place}" href="#scorecard/${encodeURIComponent(p.slug)}"><div class="prediction-rank">${place}</div>${avatarImg(p.name,'prediction-avatar',p.name)}<div class="prediction-main"><strong>${escapeHtml(p.name)}</strong><span>${officialStatusBadge(p)}${playerStatusBadge(p)}</span><small>${reason.positives.map(escapeHtml).join(' + ')}</small></div><div class="prediction-score"><small>Readiness</small><b>${m.readiness.toFixed(1)}</b><span class="outlook-band ${bandClass}">${band}</span></div><div class="prediction-confidence"><small>Confidence</small><b>${m.confidence.toFixed(1)}</b><span class="${confidenceClass}">${confidence}</span></div></a>`;
+}
+function predictionTableRow(p,index){
+  const m=predictionModel(p),[band,bandClass]=predictionBand(m.readiness),[confidence,confidenceClass]=predictionConfidence(m.confidence);
+  return `<a class="prediction-table-row" href="#scorecard/${encodeURIComponent(p.slug)}"><span>${index+1}</span><div>${avatarImg(p.name,'prediction-mini-avatar',p.name)}<strong>${escapeHtml(p.name)}</strong></div><b>${m.readiness.toFixed(1)}</b><em class="outlook-band ${bandClass}">${band}</em><small>${m.rating.toFixed(1)}</small><small>${m.momentum.toFixed(1)}</small><small>${m.consistency.toFixed(1)}</small><small>${m.top3Rate.toFixed(1)}%</small><span class="confidence-dot ${confidenceClass}">${confidence}</span></a>`;
+}
+function predictions(){
+  const modeled=DATA.players.map(p=>({p,m:predictionModel(p)})).sort((a,b)=>b.m.readiness-a.m.readiness||a.p.rank-b.p.rank);
+  const eligible=modeled.filter(x=>isRankingEligible(x.p));
+  const provisional=modeled.filter(x=>!isRankingEligible(x.p));
+  const contenders=eligible.slice(0,3);
+  const watch=provisional.slice(0,3);
+  const average=modeled.length?modeled.reduce((sum,x)=>sum+x.m.readiness,0)/modeled.length:0;
+  const highConfidence=modeled.filter(x=>x.m.confidence>=80).length;
+  return `${title('Prediction Engine','A conservative next-tournament outlook based on verified FLPR performance data.')}
+  <section class="prediction-disclaimer panel"><div><span>ⓘ</span><p><strong>Directional analysis—not a guarantee.</strong> Predictions do not change Official Ranking, rating, handicap, eligibility, or tournament records. Partnerships, draws, court conditions, and future opponents are not yet known.</p></div>${infoButton('prediction-readiness')}</section>
+  <section class="prediction-overview panel"><div class="prediction-heading"><div><span class="eyebrow">Next Tournament Outlook</span><h2>Eligible Top Contenders</h2><p>Ranked by Prediction Readiness, separate from Official Ranking.</p></div>${badge(`${eligible.length} eligible`)}</div><div class="prediction-summary">${stats([['Players Analyzed',modeled.length],['Average Readiness',average.toFixed(1)],['High-Confidence Profiles',highConfidence]])}</div><div class="prediction-podium">${contenders.map((x,i)=>predictionCard(x.p,i+1)).join('')}</div></section>
+  <section class="prediction-section panel"><div class="panel-head"><div class="panel-title-with-info"><h2>Emerging Watch</h2>${infoButton('prediction-emerging-watch')}</div>${badge('Provisional outlook')}</div>${watch.length?`<div class="emerging-watch">${watch.map((x,i)=>predictionCard(x.p,i+1)).join('')}</div>`:'<div class="notice">No Provisional player outlooks are available.</div>'}</section>
+  <section class="prediction-section panel"><div class="prediction-heading"><div><span class="eyebrow">Complete Model</span><h2>Prediction Readiness Table</h2><p>Tap any player to open the supporting scorecard.</p></div>${parameterLabel('Outlook Band','prediction-band')}</div><div class="prediction-table-head"><span>#</span><span>Player</span><span>Readiness</span><span>Outlook</span><span>Rating</span><span>Momentum</span><span>Consistency</span><span>Top-3</span><span>Evidence</span></div><div class="prediction-table">${modeled.map((x,i)=>predictionTableRow(x.p,i)).join('')}</div></section>`;
+}
+
 function formatAwardValue(a){const n=Number(a.value);if(a.metric.includes('%')||a.metric.toLowerCase().includes('rate'))return n<=1?pct(n*100):pct(n);return Number.isInteger(n)?String(n):n.toFixed(1);}
 function awardGrid(awards){return `<div class="award-grid">${awards.map(a=>`<article class="award-card panel"><div class="award-icon">🏆</div><small>${escapeHtml(a.award)}</small><img src="${avatar(a.winner)}" alt="${escapeHtml(a.winner)}"><h3>${escapeHtml(a.winner)}</h3><strong>${formatAwardValue(a)}</strong><p>${escapeHtml(a.metric)} · ${escapeHtml(a.rule)}</p></article>`).join('')}</div>`;}
 function hallOfFame(){
@@ -512,7 +567,7 @@ function importPage(){const count=loadImportedTournaments().length;return `${tit
 function about(){return `${title('About FLPR','FL Padel Ranking System — Every Point Matters.')}<section class="panel hero"><p>FLPR converts recurring padel results into ranking, handicap, player development, tournament insight, and recognition.</p><p><strong>Designed and Developed by Edy SP using AI Technology – ChatGPT.</strong></p></section>`;}
 function appendix(){return `${title('Appendix & Definitions','Core terms used throughout FLPR.')}<section class="panel definition-grid"><div><h3>FLPR Rating</h3><p>Composite score combining results and performance indicators.</p></div><div><h3>Handicap</h3><p>Balancing adjustment for mixed-level competition.</p></div><div><h3>Consistency</h3><p>Stability of performance across recorded matches.</p></div><div><h3>Momentum</h3><p>Composite of recent form, clutch performance, and adjusted win rate.</p></div><div><h3>Provisional</h3><p>Rating based on a limited sample.</p></div><div><h3>Established</h3><p>Rating supported by a larger match sample.</p></div><div><h3>Schedule Strength</h3><p>Relative difficulty of opponents faced.</p></div><div><h3>Versatility</h3><p>Effectiveness across different partner combinations.</p></div></section>`;}
 
-const VIEWS={home,tournaments,scoreboard,ranking,scorecard,halloffame:hallOfFame,statistics,import:importPage,about,appendix};
+const VIEWS={home,tournaments,scoreboard,ranking,scorecard,halloffame:hallOfFame,statistics,predictions,import:importPage,about,appendix};
 function render(){const r=route();document.querySelectorAll('.drawer a').forEach(a=>a.classList.toggle('active',a.dataset.route===r.name));try{app.innerHTML=VIEWS[r.name](r.param);app.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});wirePage(r.name);}catch(err){console.error(err);app.innerHTML=`<div class="error"><h2>Page could not be rendered</h2><p>${escapeHtml(err.message)}</p><a class="button" href="#home">Return Home</a></div>`;}}
 function wirePage(name){
   if(name==='scoreboard'){document.querySelectorAll('[data-player-href]').forEach(row=>{const go=()=>{location.hash=row.dataset.playerHref;};row.addEventListener('click',e=>{if(!e.target.closest('button,a'))go();});row.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,a')){e.preventDefault();go();}});});}
