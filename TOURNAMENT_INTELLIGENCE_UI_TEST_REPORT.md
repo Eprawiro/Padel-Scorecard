@@ -7,6 +7,7 @@
 - Public technical phase-label scan: PASS
 - Tournament display-name normalization: PASS
 - Internal tournament UUID retention: PASS
+- Official `tournament_date` precedence over import/publish timestamps: PASS
 - Flat ZIP integrity: PASS
 
 ## Preserved behavior

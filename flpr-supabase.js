@@ -76,7 +76,7 @@ window.FLPR_LIVE = (() => {
     return rows.map(r=>mergePlayer(r,bySlug.get(r.slug)));
   }
   async function loadTournaments(){
-    const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,published_at,imported_at,source_url';
+    const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url';
     const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.asc`);
     let entries=[];
     try{
@@ -100,8 +100,8 @@ window.FLPR_LIVE = (() => {
         sourceTournamentId:t.source_tournament_id,
         uuid:t.id,
         name:t.name || `JakSel T${index+1}`,
-        date:fmtDate(t.published_at||t.imported_at),
-        dateISO:String(t.published_at||t.imported_at||'').slice(0,10),
+        date:fmtDate(t.tournament_date||t.published_at||t.imported_at),
+        dateISO:String(t.tournament_date||t.published_at||t.imported_at||'').slice(0,10),
         location:'Jakarta Selatan',format:'Americano',
         players:playerCount,rounds:num(t.round_count),matches:num(t.match_count),
         totalPoints,
