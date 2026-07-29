@@ -169,6 +169,15 @@ Object.assign(STAT_INFO, {
   'rank-movement': {title:'Rank Movement',definition:'The change between the previous approved FLPR rank and the current rank.',formula:'Previous official rank − current official rank.',interpretation:'▲ means the player moved up, ▼ means the player moved down, and a dash means no verified change or no earlier comparable snapshot.'},
   'official-ranking-criteria': {title:'Official Ranking Criteria',definition:'The controls that keep strong first-time results visible without allowing a small sample to dominate the official table.',formula:'Official Rating is combined with ranking eligibility, verified participation, confidence, and the approved FLPR tie-break rules.',interpretation:'New players may show a strong rating immediately, but remain Provisional until the database marks them eligible. No tournament count is edited manually.'}
 });
+Object.assign(STAT_INFO, {
+  'verified-tournaments': {title:'Verified Tournaments',definition:'Published tournaments with a complete player field and an official podium available to the dashboard.',formula:'COUNT(tournaments where player count > 0 and podium data exists).',interpretation:'This is the tournament sample used by the Tournament Intelligence overview.'},
+  'champion-diversity': {title:'Champion Diversity',definition:'The number of different players who have won at least one verified tournament.',formula:'COUNT(DISTINCT official champion) across verified tournaments.',interpretation:'A higher number indicates that tournament titles are distributed among more players.'},
+  'title-leader': {title:'Title Leader',definition:'The player with the most verified tournament championships.',formula:'COUNT(official first-place finishes) grouped by player; ties are shown jointly.',interpretation:'This is based on official final positions, including events decided by official tie-break criteria.'},
+  'average-field': {title:'Average Field',definition:'The average number of registered players in verified tournaments.',formula:'Sum of verified tournament player counts ÷ verified tournament count.',interpretation:'This describes typical event size; it does not measure playing strength.'},
+  'closest-finish': {title:'Closest Point Finish',definition:'The smallest non-negative champion-points difference to the runner-up.',formula:'MIN(champion points − runner-up points), excluding events where official standings—not points alone—decided the champion.',interpretation:'A smaller value indicates a tighter points finish. Official tie-break events are tracked separately.'},
+  'official-tiebreak-events': {title:'Official Tie-break Events',definition:'Tournaments where the official champion had fewer total points than the runner-up but remained first under the official standings criteria.',formula:'COUNT(events where champion points − runner-up points < 0).',interpretation:'This is not a data error. It means total points alone did not determine the official winner.'},
+  'finish-profile': {title:'Finish Profile',definition:'A plain-language classification of how the official result was decided.',formula:'Negative point gap: Official Tie-break; 0–1: Photo Finish; 2–3: Close Finish; 4 or more: Clear Win.',interpretation:'This describes the tournament finish only and does not affect player rating or ranking.'}
+});
 function infoButton(key){const item=STAT_INFO[key];return item?`<button class="info-button" type="button" data-info="${escapeHtml(key)}" aria-label="Information about ${escapeHtml(item.title)}">i</button>`:'';}
 function parameterLabel(label,key){return `<span class="parameter-label"><span>${escapeHtml(label)}</span>${infoButton(key)}</span>`;}
 function openInfo(key){const item=STAT_INFO[key];if(!item)return;let modal=document.getElementById('statInfoModal');if(!modal){modal=document.createElement('div');modal.id='statInfoModal';modal.className='info-modal';modal.innerHTML='<div class="info-modal-backdrop" data-close-info></div><section class="info-modal-card" role="dialog" aria-modal="true" aria-labelledby="statInfoTitle"><button class="info-modal-close" type="button" data-close-info aria-label="Close information">×</button><div class="eyebrow">Statistic Definition</div><h2 id="statInfoTitle"></h2><p id="statInfoDefinition"></p><div class="info-detail"><small>CALCULATION</small><p id="statInfoFormula"></p></div><div class="info-detail"><small>HOW TO READ IT</small><p id="statInfoInterpretation"></p></div><div class="info-detail" id="statInfoExampleWrap"><small>EXAMPLE</small><p id="statInfoExample"></p></div></section>';document.body.appendChild(modal);}modal.querySelector('#statInfoTitle').textContent=item.title;modal.querySelector('#statInfoDefinition').textContent=item.definition;modal.querySelector('#statInfoFormula').textContent=item.formula;modal.querySelector('#statInfoInterpretation').textContent=item.interpretation;const exampleWrap=modal.querySelector('#statInfoExampleWrap');const example=modal.querySelector('#statInfoExample');if(item.example){example.textContent=item.example;exampleWrap.hidden=false;}else{example.textContent='';exampleWrap.hidden=true;}modal.classList.add('open');document.body.style.overflow='hidden';modal.querySelector('.info-modal-close').focus();}
@@ -227,6 +236,33 @@ function home(){
   <div class="section-heading"><h2 class="section-title">Hall of Fame Preview</h2><a href="#halloffame">Open Hall of Fame →</a></div>${awardGrid(DATA.awards.slice(0,4))}`;
 }
 
+function tournamentFinishProfile(t){
+  const gap=podiumPointGap(t);
+  if(gap===null)return {label:'Pending',className:'pending'};
+  if(gap<0)return {label:'Official Tie-break',className:'tiebreak'};
+  if(gap<=1)return {label:'Photo Finish',className:'photo'};
+  if(gap<=3)return {label:'Close Finish',className:'close'};
+  return {label:'Clear Win',className:'clear'};
+}
+
+function tournamentIntelligence(){
+  const verified=getTournaments().filter(t=>t.players&&Array.isArray(t.podium)&&t.podium.length>=2);
+  if(!verified.length)return '';
+  const titleCounts=new Map();
+  verified.forEach(t=>{const champion=t.podium[0][0];titleCounts.set(champion,(titleCounts.get(champion)||0)+1);});
+  const maxTitles=Math.max(...titleCounts.values());
+  const leaders=[...titleCounts.entries()].filter(([,count])=>count===maxTitles).map(([name])=>name);
+  const averageField=verified.reduce((sum,t)=>sum+Number(t.players||0),0)/verified.length;
+  const pointFinishes=verified.map(t=>({t,gap:podiumPointGap(t)})).filter(x=>x.gap!==null&&x.gap>=0).sort((a,b)=>a.gap-b.gap);
+  const closest=pointFinishes[0]||null;
+  const tieBreaks=verified.filter(t=>podiumPointGap(t)<0);
+  const eventRows=verified.slice().sort((a,b)=>tournamentSequence(a)-tournamentSequence(b)).map((t,index)=>{
+    const profile=tournamentFinishProfile(t);
+    return `<div class="tournament-intel-row"><div><strong>${escapeHtml(tournamentDisplayName(t,index))}</strong><small>${escapeHtml(t.date)}</small></div><div><small>Champion</small><strong>${escapeHtml(t.podium[0][0])}</strong></div><div><small>Field</small><strong>${t.players} players</strong></div><div><small>Decision</small><strong>${finishDecision(t)}</strong></div><span class="finish-profile ${profile.className}">${escapeHtml(profile.label)}</span></div>`;
+  }).join('');
+  return `<section class="tournament-intelligence panel"><div class="tournament-intel-head"><div><span class="eyebrow">Verified Tournament Analytics</span><h2>Tournament Intelligence</h2><p>Transparent event-level insights derived from official standings and verified player fields.</p></div>${infoButton('finish-profile')}</div><div class="tournament-intel-kpis"><div>${parameterLabel('Verified Tournaments','verified-tournaments')}<strong>${verified.length}</strong><small>Official events</small></div><div>${parameterLabel('Champion Diversity','champion-diversity')}<strong>${titleCounts.size}</strong><small>Different champions</small></div><div>${parameterLabel('Title Leader','title-leader')}<strong>${escapeHtml(leaders.join(' / '))}</strong><small>${maxTitles} championship${maxTitles===1?'':'s'}</small></div><div>${parameterLabel('Average Field','average-field')}<strong>${averageField.toFixed(1)}</strong><small>Players per event</small></div><div>${parameterLabel('Closest Point Finish','closest-finish')}<strong>${closest?`${closest.gap} point${closest.gap===1?'':'s'}`:'—'}</strong><small>${closest?escapeHtml(tournamentDisplayName(closest.t)):'No point-gap event'}</small></div><div>${parameterLabel('Official Tie-breaks','official-tiebreak-events')}<strong>${tieBreaks.length}</strong><small>${tieBreaks.length?tieBreaks.map(t=>escapeHtml(tournamentDisplayName(t))).join(', '):'None recorded'}</small></div></div><div class="tournament-intel-list">${eventRows}</div></section>`;
+}
+
 function tournamentStats(t){
   const players=Number(t.players)||0;
   if(!players)return `<div class="notice"><strong>${escapeHtml(t.status)}</strong><br>Statistics, champion, and scoreboard will be published only after verified historical data is imported.</div>`;
@@ -237,11 +273,12 @@ function tournamentStats(t){
   const runnerUp=podiumItems[1];
   const third=podiumItems[2];
   const spread=champion&&third ? Number(champion[1])-Number(third[1]) : null;
+  const spreadDisplay=spread===null?'—':spread<0?'Official standings':spread;
   const gap=champion&&runnerUp ? Number(champion[1])-Number(runnerUp[1]) : null;
   const gapDisplay=gap===null?'—':gap<0?'Official Tie-break':`${gap} point${Math.abs(gap)===1?'':'s'}`;
   const gapNote=gap===null?'Awaiting complete podium':gap<0?'Champion confirmed by official standings criteria':'Champion-points difference to runner-up';
   const detailCards=champion?`<div class="insight-grid"><div class="panel mini"><small>Champion</small><strong>${escapeHtml(champion[0])}</strong><span>${displayValue(champion[1])} points</span></div><div class="panel mini"><small>Finish Decision</small><strong>${gapDisplay}</strong><span>${gapNote}</span></div><div class="panel mini"><small>Top-3 Cut</small><strong>${third?`${third[1]} points`:'—'}</strong><span>${third?'Minimum verified podium score':'Awaiting third-place result'}</span></div></div>`:'';
-  return `<div class="tournament-insights">${stats([['Players',players],['Total Points',Number.isFinite(total)?total:'—'],['Average Points',avg===null?'—':avg.toFixed(1)],['Podium Spread',spread===null?'—':spread]])}${detailCards}</div>`;
+  return `<div class="tournament-insights">${stats([['Players',players],['Total Points',Number.isFinite(total)?total:'—'],['Average Points',avg===null?'—':avg.toFixed(1)],['Podium Spread',spreadDisplay]])}${detailCards}</div>`;
 }
 
 function championHistory(){
@@ -255,7 +292,7 @@ function tournamentComparison(){const verified=getTournaments().filter(t=>t.play
 
 function tournaments(){
   const newestFirst=getTournaments().slice().reverse();
-  return `${title('Tournament Center','Tournament summaries, podiums, statistics, and champion history.')}<div class="tournament-list">${newestFirst.map((t,index)=>`<article class="tournament-card"><div class="eyebrow">${index===0?'Latest Tournament':'Historical Tournament'}</div><h2>${escapeHtml(t.name)}</h2><div class="tournament-meta">${escapeHtml(t.location)} · ${escapeHtml(t.date)} · ${escapeHtml(t.format)}${t.courts?` · ${t.courts} Courts`:''}</div>${t.players?`${Array.isArray(t.podium)&&t.podium.length>=3?podium(t.podium):''}${tournamentStats(t)}`:tournamentStats(t)}</article>`).join('')}</div><section class="panel"><div class="panel-head"><h2>Tournament Records</h2>${badge('Verified data')}</div>${tournamentRecords()}</section>${tournamentComparison()}${championHistory()}`;
+  return `${title('Tournament Center','Tournament summaries, podiums, statistics, and champion history.')}${tournamentIntelligence()}<div class="tournament-list">${newestFirst.map((t,index)=>`<article class="tournament-card"><div class="eyebrow">${index===0?'Latest Tournament':'Historical Tournament'}</div><h2>${escapeHtml(t.name)}</h2><div class="tournament-meta">${escapeHtml(t.location)} · ${escapeHtml(t.date)} · ${escapeHtml(t.format)}${t.courts?` · ${t.courts} Courts`:''}</div>${t.players?`${Array.isArray(t.podium)&&t.podium.length>=3?podium(t.podium):''}${tournamentStats(t)}`:tournamentStats(t)}</article>`).join('')}</div><section class="panel"><div class="panel-head"><h2>Tournament Records</h2>${badge('Verified data')}</div>${tournamentRecords()}</section>${tournamentComparison()}${championHistory()}`;
 }
 
 function scoreboard(){
