@@ -2,7 +2,7 @@
 
 const ROUTES = [
   ['home','Home'],['tournaments','Tournament Center'],['scoreboard','Full Scoreboard'],['ranking','Ranking'],
-  ['scorecard','Player Scorecards'],['halloffame','Hall of Fame'],['statistics','Statistics'],['predictions','Predictions'],['import','Data Import'],
+  ['scorecard','Player Scorecards'],['halloffame','Hall of Fame'],['statistics','Statistics'],['predictions','Predictions'],['relationships','Pairing & Rivalries'],['import','Data Import'],
   ['about','About FLPR'],['appendix','Appendix & Definitions']
 ];
 
@@ -189,6 +189,12 @@ Object.assign(STAT_INFO, {
   'prediction-validation': {title:'Model Validation Status',definition:'Automated checks confirming that prediction inputs are finite, scores remain within 0–100, and eligible players stay separate from Provisional/Emerging players.',formula:'PASS requires valid inputs, bounded outputs, zero eligibility overlap, and a complete model result for every active player.',interpretation:'Validation confirms model integrity; it does not guarantee prediction accuracy.'},
   'prediction-freshness': {title:'Prediction Data Freshness',definition:'The most recent verified tournament date available to the Prediction Engine.',formula:'Latest date among published verified tournaments loaded from the live database.',interpretation:'Predictions should be reviewed after every new tournament import.'},
   'prediction-contribution': {title:'Weighted Factor Contribution',definition:'How much each performance factor contributes to the Performance Blend before confidence adjustment.',formula:'Rating × 40%; Momentum × 25%; Consistency × 15%; verified Top-3 Rate × 20%.',interpretation:'The bars explain the model; they are not independent probabilities.'}
+});
+Object.assign(STAT_INFO, {
+  'relationship-confidence': {title:'Relationship Confidence',definition:'Evidence-strength category for a partner or opponent insight based on the number of recorded shared matches.',formula:'High: 6+ matches; Medium: 3–5; Limited: 2; Early Signal: 1.',interpretation:'A strong result with Limited or Early Signal evidence should be treated as directional, not conclusive.'},
+  'chemistry-delta': {title:'Partner Chemistry Delta',definition:'The difference between performance with a specific partner and the player’s normal performance baseline.',formula:'Partnership performance rate − player baseline performance rate, expressed in percentage points.',interpretation:'Positive values suggest helpful chemistry; negative values indicate that the pairing has underperformed the player baseline.'},
+  'rivalry-pressure': {title:'Rivalry Pressure',definition:'A descriptive view of how difficult an opponent has been in recorded head-to-head matches.',formula:'Uses opponent win rate against the player, point differential, and available match count.',interpretation:'It describes historical difficulty only and does not guarantee the next result.'},
+  'pairing-recommendation': {title:'Directional Pairing Recommendation',definition:'A cautious pairing suggestion derived from the player’s best available recorded partnership evidence.',formula:'Requires positive chemistry evidence; confidence is shown separately based on shared-match count.',interpretation:'This is a planning aid, not an instruction or guaranteed optimal partnership.'}
 });
 function infoButton(key){const item=STAT_INFO[key];return item?`<button class="info-button" type="button" data-info="${escapeHtml(key)}" aria-label="Information about ${escapeHtml(item.title)}">i</button>`:'';}
 function parameterLabel(label,key){return `<span class="parameter-label"><span>${escapeHtml(label)}</span>${infoButton(key)}</span>`;}
@@ -554,6 +560,52 @@ function predictions(){
   <section class="prediction-section panel"><div class="prediction-heading"><div><span class="eyebrow">Complete Model</span><h2>Prediction Readiness Table</h2><p>Tap any player to open the supporting scorecard.</p></div>${parameterLabel('Outlook Band','prediction-band')}</div><div class="prediction-table-head"><span>#</span><span>Player</span><span>Readiness</span><span>Outlook</span><span>Rating</span><span>Momentum</span><span>Consistency</span><span>Top-3</span><span>Evidence</span></div><div class="prediction-table">${modeled.map((x,i)=>predictionTableRow(x.p,i)).join('')}</div></section>`;
 }
 
+function relationshipConfidence(matches){
+  const n=Math.max(0,Number(matches)||0);
+  return n>=6?['High','high']:n>=3?['Medium','medium']:n===2?['Limited','limited']:n===1?['Early Signal','early']:['Insufficient','insufficient'];
+}
+function relationshipEvidence(obj){
+  const matches=Math.max(0,Number(obj?.matches)||0),[label,className]=relationshipConfidence(matches);
+  return {matches,label,className};
+}
+function relationshipMetric(icon,label,obj,type){
+  if(!obj?.name)return `<div class="relationship-metric empty"><span>${icon}</span><div><small>${escapeHtml(label)}</small><strong>Pending evidence</strong><p>No verified relationship data yet.</p></div></div>`;
+  const evidence=relationshipEvidence(obj);
+  const value=type==='partner'
+    ?`${Number(obj.chemistryDelta||0)>=0?'+':''}${Number(obj.chemistryDelta||0).toFixed(1)} chemistry`
+    :`${Number(obj.winRate||0).toFixed(1)}% player win rate`;
+  const detail=Number.isFinite(Number(obj.pointDiffPerMatch))?` · ${Number(obj.pointDiffPerMatch)>0?'+':''}${Number(obj.pointDiffPerMatch).toFixed(2)} pts/match`:'';
+  return `<div class="relationship-metric"><span>${icon}</span><div><small>${escapeHtml(label)}</small><strong>${escapeHtml(obj.name)}</strong><p>${value}${detail}</p><em class="evidence-chip ${evidence.className}">${evidence.label} · ${evidence.matches} match${evidence.matches===1?'':'es'}</em></div></div>`;
+}
+function pairingRecommendation(p){
+  const partner=p.analysis?.bestPartner,evidence=relationshipEvidence(partner),delta=Number(partner?.chemistryDelta||0);
+  if(!partner?.name)return {title:'Awaiting partnership data',text:'More verified shared matches are required before a pairing signal can be shown.',className:'pending'};
+  if(delta<=0)return {title:'No positive pairing signal yet',text:`${partner.name} is the best available record, but chemistry remains ${delta.toFixed(1)} points below baseline. Test alternatives before using this as a recommendation.`,className:'review'};
+  return {title:`Directional option: ${partner.name}`,text:`Positive chemistry signal of +${delta.toFixed(1)} points with ${evidence.label.toLowerCase()} evidence from ${evidence.matches} match${evidence.matches===1?'':'es'}.`,className:evidence.className};
+}
+function relationshipPlayerCard(p){
+  const a=p.analysis||{},recommendation=pairingRecommendation(p);
+  return `<article class="relationship-player-card" data-relationship-search="${escapeHtml(`${p.name} ${a.bestPartner?.name||''} ${a.challengingPartner?.name||''} ${a.hardestOpponent?.name||''} ${a.favorableOpponent?.name||''}`.toLowerCase())}"><header>${avatarImg(p.name,'relationship-player-avatar',p.name)}<div><span>Rank #${p.rank}</span><h3>${escapeHtml(p.name)}</h3><small>${escapeHtml(p.status)} · ${p.matches} matches</small></div><a href="#scorecard/${encodeURIComponent(p.slug)}" aria-label="Open ${escapeHtml(p.name)} scorecard">❯</a></header><div class="relationship-metric-grid">${relationshipMetric('🤝','Best Available Chemistry',a.bestPartner,'partner')}${relationshipMetric('⚠','Challenging Partnership',a.challengingPartner,'partner')}${relationshipMetric('⚔','Toughest Opponent',a.hardestOpponent,'opponent')}${relationshipMetric('🎯','Favorable Matchup',a.favorableOpponent,'opponent')}</div><footer class="${recommendation.className}"><div>${parameterLabel('Pairing Outlook','pairing-recommendation')}<strong>${escapeHtml(recommendation.title)}</strong></div><p>${escapeHtml(recommendation.text)}</p></footer></article>`;
+}
+function relationshipLeaderRow(p,obj,type,index){
+  const evidence=relationshipEvidence(obj);
+  const metric=type==='partner'?`${Number(obj.chemistryDelta||0)>=0?'+':''}${Number(obj.chemistryDelta||0).toFixed(1)}`:`${Number(obj.winRate||0).toFixed(1)}%`;
+  return `<a class="relationship-leader-row" href="#scorecard/${encodeURIComponent(p.slug)}"><span>${index+1}</span>${avatarImg(p.name,'relationship-mini-avatar',p.name)}<div><strong>${escapeHtml(p.name)}</strong><small>${type==='partner'?'with':'vs'} ${escapeHtml(obj.name)}</small></div><b>${metric}</b><em class="evidence-chip ${evidence.className}">${evidence.label}</em></a>`;
+}
+function relationships(){
+  const profiles=DATA.players.filter(p=>p.analysis);
+  const positive=profiles.filter(p=>Number(p.analysis?.bestPartner?.chemistryDelta||0)>0);
+  const chemistry=positive.slice().sort((a,b)=>Number(b.analysis.bestPartner.chemistryDelta||0)-Number(a.analysis.bestPartner.chemistryDelta||0)).slice(0,5);
+  const rivalries=profiles.filter(p=>p.analysis?.hardestOpponent).slice().sort((a,b)=>{const x=a.analysis.hardestOpponent,y=b.analysis.hardestOpponent;const xs=(100-Number(x.winRate||0))+Math.max(0,-Number(x.pointDiffPerMatch||0))*5+Math.min(6,Number(x.matches||0))*2;const ys=(100-Number(y.winRate||0))+Math.max(0,-Number(y.pointDiffPerMatch||0))*5+Math.min(6,Number(y.matches||0))*2;return ys-xs;}).slice(0,5);
+  const mediumEvidence=profiles.filter(p=>Number(p.analysis?.bestPartner?.matches||0)>=3).length;
+  const maxMatches=Math.max(0,...profiles.flatMap(p=>[p.analysis?.bestPartner?.matches,p.analysis?.hardestOpponent?.matches].map(Number).filter(Number.isFinite)));
+  return `${title('Pairing & Rivalry Intelligence','Verified relationship insights for partnership planning and matchup awareness.')}
+  <section class="relationship-disclaimer panel"><div><span>ⓘ</span><p><strong>Historical and directional—not a guarantee.</strong> Pairing and rivalry insights use recorded matches only. Court conditions, format, form, and future draws remain unknown.</p></div>${infoButton('relationship-confidence')}</section>
+  <section class="relationship-audit panel"><div class="relationship-title"><div><span class="eyebrow">Relationship Evidence Audit</span><h2>Data Coverage</h2><p>Every insight carries an explicit sample-size confidence label.</p></div><span class="validation-status pass">✓ READ-ONLY</span></div><div class="relationship-kpis">${stats([['Profiles Analyzed',profiles.length],['Positive Pairing Signals',positive.length],['Medium/High Pairing Evidence',mediumEvidence],['Largest Shared Sample',`${maxMatches} matches`]])}</div><div class="freshness-row"><div>${parameterLabel('Confidence Rules','relationship-confidence')}<strong>Early 1 · Limited 2 · Medium 3–5 · High 6+</strong></div><div><span>Database Impact</span><strong>Read-only · No changes</strong></div><div><span>Latest Verified Data</span><strong>${escapeHtml(predictionFreshness())}</strong></div></div></section>
+  <section class="relationship-leaders"><div class="panel"><div class="panel-head"><div class="panel-title-with-info"><h2>Strongest Positive Signals</h2>${infoButton('chemistry-delta')}</div>${badge('Directional')}</div><div class="relationship-leader-list">${chemistry.map((p,i)=>relationshipLeaderRow(p,p.analysis.bestPartner,'partner',i)).join('')||'<div class="notice">No positive partnership signal is available.</div>'}</div></div><div class="panel"><div class="panel-head"><div class="panel-title-with-info"><h2>Highest Rivalry Pressure</h2>${infoButton('rivalry-pressure')}</div>${badge('Historical')}</div><div class="relationship-leader-list">${rivalries.map((p,i)=>relationshipLeaderRow(p,p.analysis.hardestOpponent,'opponent',i)).join('')||'<div class="notice">No rivalry evidence is available.</div>'}</div></div></section>
+  <section class="relationship-directory panel"><div class="relationship-title"><div><span class="eyebrow">Player-by-Player Matrix</span><h2>Pairing & Matchup Directory</h2><p>Search a player, partner, or opponent to inspect the supporting evidence.</p></div><div class="relationship-search"><input id="relationshipSearch" class="input" placeholder="Search player or relationship…" aria-label="Search pairing and rivalry directory"><span id="relationshipCount">${profiles.length} profiles</span></div></div><div class="relationship-player-grid" id="relationshipDirectory">${profiles.slice().sort((a,b)=>a.rank-b.rank).map(relationshipPlayerCard).join('')}</div></section>`;
+}
+
 function formatAwardValue(a){const n=Number(a.value);if(a.metric.includes('%')||a.metric.toLowerCase().includes('rate'))return n<=1?pct(n*100):pct(n);return Number.isInteger(n)?String(n):n.toFixed(1);}
 function awardGrid(awards){return `<div class="award-grid">${awards.map(a=>`<article class="award-card panel"><div class="award-icon">🏆</div><small>${escapeHtml(a.award)}</small><img src="${avatar(a.winner)}" alt="${escapeHtml(a.winner)}"><h3>${escapeHtml(a.winner)}</h3><strong>${formatAwardValue(a)}</strong><p>${escapeHtml(a.metric)} · ${escapeHtml(a.rule)}</p></article>`).join('')}</div>`;}
 function hallOfFame(){
@@ -602,11 +654,12 @@ function importPage(){const count=loadImportedTournaments().length;return `${tit
 function about(){return `${title('About FLPR','FL Padel Ranking System — Every Point Matters.')}<section class="panel hero"><p>FLPR converts recurring padel results into ranking, handicap, player development, tournament insight, and recognition.</p><p><strong>Designed and Developed by Edy SP using AI Technology – ChatGPT.</strong></p></section>`;}
 function appendix(){return `${title('Appendix & Definitions','Core terms used throughout FLPR.')}<section class="panel definition-grid"><div><h3>FLPR Rating</h3><p>Composite score combining results and performance indicators.</p></div><div><h3>Handicap</h3><p>Balancing adjustment for mixed-level competition.</p></div><div><h3>Consistency</h3><p>Stability of performance across recorded matches.</p></div><div><h3>Momentum</h3><p>Composite of recent form, clutch performance, and adjusted win rate.</p></div><div><h3>Provisional</h3><p>Rating based on a limited sample.</p></div><div><h3>Established</h3><p>Rating supported by a larger match sample.</p></div><div><h3>Schedule Strength</h3><p>Relative difficulty of opponents faced.</p></div><div><h3>Versatility</h3><p>Effectiveness across different partner combinations.</p></div></section>`;}
 
-const VIEWS={home,tournaments,scoreboard,ranking,scorecard,halloffame:hallOfFame,statistics,predictions,import:importPage,about,appendix};
+const VIEWS={home,tournaments,scoreboard,ranking,scorecard,halloffame:hallOfFame,statistics,predictions,relationships,import:importPage,about,appendix};
 function render(){const r=route();document.querySelectorAll('.drawer a').forEach(a=>a.classList.toggle('active',a.dataset.route===r.name));try{app.innerHTML=VIEWS[r.name](r.param);app.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});wirePage(r.name);}catch(err){console.error(err);app.innerHTML=`<div class="error"><h2>Page could not be rendered</h2><p>${escapeHtml(err.message)}</p><a class="button" href="#home">Return Home</a></div>`;}}
 function wirePage(name){
   if(name==='scoreboard'){document.querySelectorAll('[data-player-href]').forEach(row=>{const go=()=>{location.hash=row.dataset.playerHref;};row.addEventListener('click',e=>{if(!e.target.closest('button,a'))go();});row.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button,a')){e.preventDefault();go();}});});}
   if(name==='scorecard'){const input=document.getElementById('scorecardSearch');input?.addEventListener('input',()=>{const q=input.value.toLowerCase();document.querySelectorAll('#scorecardDirectory .scorecard-select-card').forEach(c=>c.hidden=!c.textContent.toLowerCase().includes(q));});}
+  if(name==='relationships'){const input=document.getElementById('relationshipSearch'),count=document.getElementById('relationshipCount');input?.addEventListener('input',()=>{const q=input.value.trim().toLowerCase();let visible=0;document.querySelectorAll('#relationshipDirectory .relationship-player-card').forEach(card=>{card.hidden=!String(card.dataset.relationshipSearch||'').includes(q);if(!card.hidden)visible++;});if(count)count.textContent=`${visible} profile${visible===1?'':'s'}`;});}
   if(name==='import'){
     const autoButton=document.getElementById('fetchAmericanoPreview');
     autoButton?.addEventListener('click',async()=>{
