@@ -724,12 +724,13 @@ function wirePage(name){
           out.innerHTML='<div class="error"><strong>Supabase connection is not configured.</strong> Check <code>flpr-config.js</code>.</div>';
           return;
         }
-        const endpoint=`${supabaseUrl}/functions/v1/americano-preview`;
+        const importFunction=String(window.FLPR_CONFIG?.importFunction||'flpr-import-engine').trim();
+        const endpoint=`${supabaseUrl}/functions/v1/${encodeURIComponent(importFunction)}`;
         let res;
         try{
           res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','apikey':anonKey,'authorization':`Bearer ${anonKey}`},body:requestBody});
         }catch(error){
-          out.innerHTML=`<div class="error"><strong>Supabase import service unreachable.</strong> ${escapeHtml(error?.message||'Network request failed.')}<br><small>Confirm that the <code>americano-preview</code> Edge Function is deployed.</small></div>`;
+          out.innerHTML=`<div class="error"><strong>Supabase import service unreachable.</strong> ${escapeHtml(error?.message||'Network request failed.')}<br><small>Confirm that the configured <code>${escapeHtml(importFunction)}</code> Edge Function is deployed and reachable.</small></div>`;
           return;
         }
         const contentType=res.headers.get('content-type')||'';
