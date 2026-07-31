@@ -1,0 +1,32 @@
+'use strict';
+
+(function(){
+  const cfg=window.FLPR_CONFIG||{};
+  const base=String(cfg.supabaseUrl||'').replace(/\/$/,'');
+  const anon=String(cfg.supabaseAnonKey||'');
+  const adminFunction=String(cfg.adminFunction||'flpr-admin-api');
+  const sessionKey='flpr_admin_session_v1';
+
+  function readSession(){try{const value=JSON.parse(localStorage.getItem(sessionKey)||'null');return value&&value.access_token?value:null;}catch{return null;}}
+  function saveSession(value){if(value)localStorage.setItem(sessionKey,JSON.stringify(value));else localStorage.removeItem(sessionKey);}
+  function emailFor(userName){const clean=String(userName||'').trim().toLowerCase();return cfg.adminLoginEmails?.[clean]||`${clean}@admin.flpr.local`;}
+  async function jsonFetch(url,options={}){const res=await fetch(url,options);const type=res.headers.get('content-type')||'';const body=type.includes('application/json')?await res.json():{error:`HTTP ${res.status}`};if(!res.ok)throw new Error(body.error_description||body.msg||body.error||`Request failed (${res.status})`);return body;}
+  async function login(userName,password){
+    if(!/^[a-z0-9._-]{3,32}$/i.test(String(userName||'').trim()))throw new Error('Enter a valid User ID.');
+    const auth=await jsonFetch(`${base}/auth/v1/token?grant_type=password`,{method:'POST',headers:{apikey:anon,'content-type':'application/json'},body:JSON.stringify({email:emailFor(userName),password})});
+    const session={...auth,user_name:String(userName).trim().toLowerCase()};saveSession(session);
+    try{const verified=await api('session',{},session);session.admin=verified.admin;saveSession(session);return session;}catch(error){saveSession(null);throw error;}
+  }
+  async function refresh(session){if(!session?.refresh_token)throw new Error('Admin session expired. Please log in again.');const auth=await jsonFetch(`${base}/auth/v1/token?grant_type=refresh_token`,{method:'POST',headers:{apikey:anon,'content-type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token})});const next={...session,...auth};saveSession(next);return next;}
+  async function api(action,payload={},provided=null,retried=false){let session=provided||readSession();if(!session?.access_token)throw new Error('Admin login is required.');try{return await jsonFetch(`${base}/functions/v1/${encodeURIComponent(adminFunction)}`,{method:'POST',headers:{apikey:anon,authorization:`Bearer ${session.access_token}`,'content-type':'application/json'},body:JSON.stringify({action,...payload})});}catch(error){if(!retried&&/expired|invalid session|jwt/i.test(error.message)){session=await refresh(session);return api(action,payload,session,true);}throw error;}}
+  async function rest(path,options={}){const session=readSession();if(!session?.access_token)throw new Error('Admin login is required.');return jsonFetch(`${base}/rest/v1/${path}`,{...options,headers:{apikey:anon,authorization:`Bearer ${session.access_token}`,'content-type':'application/json',...(options.headers||{})}});}
+  function safeName(value){return String(value||'file').toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'');}
+  async function upload(bucket,path,file,upsert=true){const session=readSession();if(!session?.access_token)throw new Error('Admin login is required.');const res=await fetch(`${base}/storage/v1/object/${bucket}/${path}`,{method:'POST',headers:{apikey:anon,authorization:`Bearer ${session.access_token}`,'x-upsert':String(upsert),'content-type':file.type||'application/octet-stream'},body:file});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(body.message||body.error||`Upload failed (${res.status})`);return `${base}/storage/v1/object/public/${bucket}/${path}`;}
+  async function listPlayers(){return rest('players?select=id,name,slug,photo_url&order=name.asc');}
+  async function uploadPlayerPhoto(player,file){if(!file)throw new Error('Choose an image first.');const ext=(file.name.split('.').pop()||'jpg').toLowerCase();const path=`players/${safeName(player.slug||player.name)}.${ext}`;const publicUrl=await upload('flpr-player-photos',path,file,true);await rest(`players?id=eq.${encodeURIComponent(player.id)}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({photo_url:publicUrl})});return publicUrl;}
+  async function findPublishedTournament(preview){const source=String(preview?.sourceId||'');const query=source?`source_tournament_id=eq.${encodeURIComponent(source)}`:'status=eq.published&order=published_at.desc&limit=1';const rows=await rest(`tournaments?select=id,name,source_tournament_id,cover_photo_url&${query}`);return rows?.[0]||null;}
+  async function uploadTournamentMediaForPreview(preview,coverFile,galleryFiles=[]){if(!coverFile&&!galleryFiles.length)return null;const tournament=await findPublishedTournament(preview);if(!tournament)throw new Error('Tournament was published, but its media record could not yet be located. Upload photos later from Tournament Management.');const stamp=Date.now();if(coverFile){const ext=(coverFile.name.split('.').pop()||'jpg').toLowerCase();const path=`${tournament.id}/cover-${stamp}.${ext}`;const url=await upload('flpr-tournament-media',path,coverFile,true);await rest(`tournaments?id=eq.${encodeURIComponent(tournament.id)}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({cover_photo_url:url})});}
+    for(let i=0;i<galleryFiles.length;i++){const file=galleryFiles[i];const ext=(file.name.split('.').pop()||'jpg').toLowerCase();const path=`${tournament.id}/gallery-${stamp}-${i+1}-${safeName(file.name)}.${ext}`;const url=await upload('flpr-tournament-media',path,file,false);await rest('flpr_tournament_media',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({tournament_id:tournament.id,storage_path:path,public_url:url,media_type:'gallery',sort_order:i,uploaded_by:readSession().user?.id})});}return tournament;}
+  function logout(){saveSession(null);}
+  window.FLPR_ADMIN={session:readSession,login,logout,api,listPlayers,uploadPlayerPhoto,uploadTournamentMediaForPreview};
+})();
