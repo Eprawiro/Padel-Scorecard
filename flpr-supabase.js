@@ -148,6 +148,26 @@ window.FLPR_LIVE = (() => {
     try{result.handicaps=await rest('handicap_history?select=player_id,tournament_id,handicap_before,handicap_after,handicap_change,provisional,created_at&order=created_at.asc');}catch(error){console.warn('Handicap history unavailable.',error);}
     return result;
   }
+  async function loadAdvancedMetrics(){
+    const cols='player_id,clutch_matches,proposed_clutch,average_opponent_rating,proposed_schedule_strength,unique_partners,proposed_versatility,raw_momentum,proposed_momentum_index,raw_dominance,proposed_dominance_index';
+    try{return await rest(`v_flpr_advanced_metrics_live?select=${encodeURIComponent(cols)}`);}
+    catch(error){console.warn('Live advanced-metric view unavailable.',error);return [];}
+  }
+  function applyAdvancedMetrics(players,rows){
+    const byPlayer=new Map(rows.map(x=>[x.player_id,x]));
+    for(const player of players){const row=byPlayer.get(player.id);if(!row)continue;
+      player.clutch=row.proposed_clutch==null?null:Number((num(row.proposed_clutch)*100).toFixed(1));
+      player.clutchMatches=num(row.clutch_matches);
+      player.sos=Number((num(row.proposed_schedule_strength)*100).toFixed(1));
+      player.averageOpponentRating=Number(num(row.average_opponent_rating).toFixed(2));
+      player.versatility=Number((num(row.proposed_versatility)*100).toFixed(1));
+      player.uniquePartners=num(row.unique_partners);
+      player.recentForm=Number(num(row.proposed_momentum_index).toFixed(1));
+      player.rawMomentum=num(row.raw_momentum);
+      player.dominance=Number(num(row.proposed_dominance_index).toFixed(1));
+      player.rawDominance=num(row.raw_dominance);
+      player.advancedLive=true;
+    }}
   function relationshipObject(row){return {
     id:row.related_player_id,
     name:row.related_player_name,
@@ -155,12 +175,13 @@ window.FLPR_LIVE = (() => {
     winRate:num(row.win_rate),pointDiffPerMatch:num(row.point_diff_per_match),chemistryDelta:num(row.chemistry_delta)
   };}
   function liveNarrative(player){
-    const metrics=[['clutch execution',player.clutch],['partner versatility',player.versatility],['schedule-adjusted performance',player.adjustedWinRate],['consistency',player.consistency]];
-    const strongest=metrics.slice().sort((a,b)=>num(b[1])-num(a[1]))[0];
-    const priority=metrics.slice().sort((a,b)=>num(a[1])-num(b[1]))[0];
+    const metrics=[['clutch execution',player.clutch],['partner versatility',player.versatility],['schedule-adjusted performance',player.adjustedWinRate],['consistency',player.consistency]].filter(([,value])=>value!==null&&value!==undefined&&Number.isFinite(Number(value)));
+    const strongest=metrics.slice().sort((a,b)=>Number(b[1])-Number(a[1]))[0]||['verified performance','—'];
+    const priority=metrics.slice().sort((a,b)=>Number(a[1])-Number(b[1]))[0]||['additional match evidence','—'];
+    const clutchEvidence=player.clutch===null?' Clutch guidance remains pending until a verified close-match sample is available.':'';
     return {
-      summary:`Live FLPR data identifies ${strongest[0]} as the strongest current performance signal at ${num(strongest[1]).toFixed(1)}.`,
-      coachNote:`Development priority: improve ${priority[0]} from the current ${num(priority[1]).toFixed(1)} index.`,
+      summary:`Live FLPR data identifies ${strongest[0]} as the strongest current performance signal at ${Number(strongest[1]).toFixed(1)}.`,
+      coachNote:`Development priority: improve ${priority[0]} from the current ${Number(priority[1]).toFixed(1)} index.${clutchEvidence}`,
       reliabilityNote:`Rating reliability is ${num(player.reliabilityScore).toFixed(1)} based on the current verified match sample.`
     };
   }
@@ -178,7 +199,8 @@ window.FLPR_LIVE = (() => {
     }
   }
   async function hydrate(snapshot){
-    const [players,tournaments,historical,relationships,officialHistories]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics(),loadRelationships(),loadOfficialHistories()]);
+    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics(),loadRelationships(),loadOfficialHistories(),loadAdvancedMetrics()]);
+    applyAdvancedMetrics(players,advancedMetrics);
     applyRelationships(players,relationships);
     for(const player of players){
       const analytics=historical.get(player.id);
@@ -233,7 +255,7 @@ window.FLPR_LIVE = (() => {
       meta:{...(snapshot.meta||{}),version:'Tournament Intelligence',dataMode:'LIVE SUPABASE + HISTORICAL ANALYTICS',sourceWorkbook:'Supabase live database with approved analytics fallback',liveLoadedAt:new Date().toISOString()},
       kpis,players,
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
-      live:{ok:true,players:players.length,tournaments:tournaments.length,relationships:relationships.length,ratingHistory:officialHistories.ratings.length,handicapHistory:officialHistories.handicaps.length,loadedAt:new Date().toISOString()},
+      live:{ok:true,players:players.length,tournaments:tournaments.length,relationships:relationships.length,advancedMetrics:advancedMetrics.length,ratingHistory:officialHistories.ratings.length,handicapHistory:officialHistories.handicaps.length,loadedAt:new Date().toISOString()},
       tournaments
     };
   }

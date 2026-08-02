@@ -333,8 +333,8 @@ function ranking(){
 }
 
 function metricBar(label,value,caption='',infoKey=''){
-  const v=Math.max(0,Math.min(100,Number(value)||0));
-  return `<div class="metric-bar"><div class="metric-bar-head">${parameterLabel(label,infoKey)}<strong>${v.toFixed(1)}</strong></div><div class="metric-track"><i style="width:${v}%"></i></div>${caption?`<small>${escapeHtml(caption)}</small>`:''}</div>`;
+  const valid=value!==null&&value!==undefined&&Number.isFinite(Number(value)),v=valid?Math.max(0,Math.min(100,Number(value))):0;
+  return `<div class="metric-bar"><div class="metric-bar-head">${parameterLabel(label,infoKey)}<strong>${valid?v.toFixed(1):'—'}</strong></div><div class="metric-track"><i style="width:${v}%"></i></div>${caption?`<small>${escapeHtml(caption)}</small>`:''}${valid?'':'<small>Insufficient verified evidence</small>'}</div>`;
 }
 
 function radarChart(p){
@@ -374,7 +374,7 @@ function ratingProfile(p){const rows=Array.isArray(p.ratingHistory)?p.ratingHist
 function rankingProfile(p){const rows=Array.isArray(p.analyticsTimeline)?p.analyticsTimeline.filter(x=>Number.isFinite(Number(x.rank))):[];if(!rows.length)return verifiedHistoryPending('Ranking',`#${p.rank}`);return profileChart(rows.map(x=>-Number(x.rank)),rows.map((x,i)=>snapshotDateLabel(x.captured_at||x.snapshot_key,i)),'Verified ranking history',v=>`#${Math.abs(v).toFixed(0)}`);}
 function handicapProfile(p){const rows=Array.isArray(p.handicapHistory)?p.handicapHistory:[];if(!rows.length)return verifiedHistoryPending('Handicap',`${Number(p.handicap)>0?'+':''}${Number(p.handicap)}`);return profileChart(rows.map(x=>Number(x.handicap_after)),rows.map((x,i)=>snapshotDateLabel(x.created_at,i)),'Verified handicap history');}
 
-function statBars(p){const rows=[['Adjusted Win Rate',p.adjustedWinRate,'adjusted-win-rate'],['Point Dominance',p.dominance,'point-dominance'],['Consistency',p.consistency,'consistency'],['Clutch',p.clutch,'clutch'],['Schedule Strength',p.sos,'schedule-strength'],['Versatility',p.versatility,'partner-versatility'],['Recent Form',p.recentForm,'recent-form'],['Momentum',momentumScore(p),'momentum']];return `<div class="stat-bars">${rows.map(([k,v,key])=>`<div class="stat-bar-row"><span>${parameterLabel(k,key)}</span><div><i style="--bar:${Math.max(0,Math.min(100,v))}%;width:var(--bar)"></i></div><b>${Number(v).toFixed(1)}</b></div>`).join('')}</div>`;}
+function statBars(p){const rows=[['Adjusted Win Rate',p.adjustedWinRate,'adjusted-win-rate'],['Point Dominance',p.dominance,'point-dominance'],['Consistency',p.consistency,'consistency'],['Clutch',p.clutch,'clutch'],['Schedule Strength',p.sos,'schedule-strength'],['Versatility',p.versatility,'partner-versatility'],['Recent Form',p.recentForm,'recent-form'],['Momentum',momentumScore(p),'momentum']];return `<div class="stat-bars">${rows.map(([k,v,key])=>{const valid=v!==null&&v!==undefined&&Number.isFinite(Number(v)),n=valid?Math.max(0,Math.min(100,Number(v))):0;return `<div class="stat-bar-row"><span>${parameterLabel(k,key)}</span><div><i style="--bar:${n}%;width:var(--bar)"></i></div><b>${valid?n.toFixed(1):'—'}</b></div>`;}).join('')}</div>`;}
 
 function relationCard(icon,label,obj,infoKey){return `<div class="relation-card"><span class="relation-icon">${icon}</span><div><small>${parameterLabel(label,infoKey)}</small><strong>${escapeHtml(obj?.name||'—')}</strong><p>${obj?.matches?`${obj.matches} matches · ${Number(obj.winRate||0).toFixed(1)}% win rate`:'Insufficient verified data'}</p></div></div>`;}
 function performanceCommandCenter(p){const items=[['Current Rank',`#${p.rank}`,'rank',Math.max(8,100-(p.rank-1)*4)],['Handicap',`${p.handicap>0?'+':''}${p.handicap}`,'handicap',Math.max(10,50+Number(p.handicap||0)*10)],['FLPR Rating',Number(p.rating).toFixed(2),'average-rating',Math.max(10,Math.min(100,Number(p.rating||0)))],['Momentum',momentumScore(p).toFixed(1),'momentum',momentumScore(p)],['Consistency',Number(p.consistency).toFixed(1),'consistency',Number(p.consistency||0)]];return `<section class="performance-command panel"><div class="panel-head">${panelTitle('Performance Command Center','statistical-profile')}${badge('At-a-glance')}</div><div class="command-grid">${items.map(([label,value,key,score])=>`<div class="command-kpi"><div class="command-ring" style="--score:${Math.max(0,Math.min(100,score))}"><span>${escapeHtml(value)}</span></div><div>${parameterLabel(label,key)}<small>${label==='Current Rank'?'Competitive position':label==='Handicap'?'Match balancing value':label==='FLPR Rating'?'Current composite score':label==='Momentum'?'Recent performance pulse':'Performance stability'}</small></div></div>`).join('')}</div></section>`;}
@@ -412,7 +412,7 @@ function careerCoach(p,history,c){
   if(Number(p.winRate||0)>=50)strengths.push('Winning record across verified matches');
   if(!strengths.length)strengths.push('Building a reliable competitive foundation');
   if(wins===0&&podiums>0)next.push('Convert podium finishes into a first championship');
-  if(Number(p.clutch||0)<65)next.push('Improve execution in close and high-pressure matches');
+  if(p.clutch!==null&&p.clutch!==undefined&&Number(p.clutch)<65)next.push('Improve execution in close and high-pressure matches');
   if(momentumScore(p)<60)next.push('Build stronger recent-form momentum');
   if(Number(p.versatility||0)<65)next.push('Develop effectiveness with a wider range of partners');
   if(!next.length)next.push('Maintain current form and target consistent top-three finishes');
@@ -488,7 +488,7 @@ function statistics(){
   const momentum=DATA.players.slice().sort((a,b)=>momentumScore(b)-momentumScore(a));
   const win=leaderboard('winRate',true,p=>p.matches>=6);
   const dominant=leaderboard('dominance');
-  const clutch=leaderboard('clutch');
+  const clutch=leaderboard('clutch',true,p=>p.clutch!==null&&p.clutch!==undefined);
   const versatile=leaderboard('versatility');
   const tough=leaderboard('sos');
   const partnerChemistry=DATA.players.filter(p=>p.analysis?.bestPartner).slice().sort((a,b)=>Number(b.analysis.bestPartner.chemistryDelta||0)-Number(a.analysis.bestPartner.chemistryDelta||0));
