@@ -473,7 +473,8 @@ function scorecardDetail(p){
 function playerAchievements(p){
   const awards=DATA.awards.filter(a=>slugify(a.winner)===p.slug);
   const badges=[];if(p.rank===1)badges.push('FLPR #1');if(p.consistency>=90)badges.push('Consistency Elite');if(momentumScore(p)>=75)badges.push('On Fire');if(p.matches>=20)badges.push('Iron Player');
-  return `<div class="achievement-list">${[...badges,...awards.map(a=>a.award)].map(x=>badge(x,'gold')).join('')||'<span class="muted">No official badge yet.</span>'}</div>`;
+  const unique=[...new Set([...badges,...awards.map(a=>a.award)].filter(Boolean))];
+  return `<div class="achievement-list">${unique.map(x=>badge(x,'gold')).join('')||'<span class="muted">No official badge yet.</span>'}</div>`;
 }
 function scorecard(param){if(!param)return scorecardDirectory();const p=DATA.players.find(x=>x.slug===param);return p?scorecardDetail(p):`${title('Player not found','Choose a player from the directory.')}<a class="button" href="#scorecard">Open Player Scorecards</a>`;}
 

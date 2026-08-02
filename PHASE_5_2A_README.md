@@ -10,6 +10,7 @@
 - Rating and handicap history loaders are ready for future official changes.
 - Synthetic rating, ranking, and handicap profile points are removed.
 - Cache versions bumped to `5.2a`.
+- Achievement badges are deduplicated when the same badge is present in both live rules and the award snapshot.
 
 ## Verified backend coverage
 
