@@ -11,6 +11,7 @@
 - Synthetic rating, ranking, and handicap profile points are removed.
 - Cache versions bumped to `5.2a`.
 - Achievement badges are deduplicated when the same badge is present in both live rules and the award snapshot.
+- History panels clearly distinguish overall FLPR ranking snapshots from individual tournament finishing positions.
 
 ## Verified backend coverage
 
