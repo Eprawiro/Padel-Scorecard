@@ -482,6 +482,39 @@ function getPath(obj,path){return path.split('.').reduce((v,k)=>v?.[k],obj);}
 function leaderboard(path,desc=true,filter=()=>true){return DATA.players.filter(filter).slice().sort((a,b)=>desc?Number(getPath(b,path)||0)-Number(getPath(a,path)||0):Number(getPath(a,path)||0)-Number(getPath(b,path)||0));}
 function board(titleText,players,valueFn,label,infoKey){return `<section class="leaderboard panel"><div class="panel-head"><div class="panel-title-with-info"><h3>${escapeHtml(titleText)}</h3>${infoButton(infoKey)}</div>${badge(label)}</div>${players.slice(0,5).map((p,i)=>`<a href="#scorecard/${encodeURIComponent(p.slug)}" class="leader-row"><b>#${i+1}</b><img src="${avatar(p.name)}" alt=""><span>${escapeHtml(p.name)}</span><strong>${escapeHtml(valueFn(p))}</strong></a>`).join('')}</section>`;}
 
+function metricTier(value){
+  if(value===null||value===undefined||!Number.isFinite(Number(value)))return ['Insufficient','unscored'];
+  const v=Number(value);
+  return v>=85?['Elite','elite']:v>=70?['Excellent','excellent']:v>=55?['Good','good']:v>=40?['Average','average']:['Developing','developing'];
+}
+function advancedMetricValue(p,key){
+  return key==='momentum'?momentumScore(p):Number(p[key]);
+}
+function advancedMetricsOverview(){
+  const metrics=[
+    ['Momentum','momentum','momentum'],
+    ['Consistency','consistency','consistency'],
+    ['Dominance','dominance','point-dominance'],
+    ['Clutch','clutch','clutch-performance'],
+    ['Versatility','versatility','partner-versatility'],
+    ['Schedule Strength','sos','schedule-strength']
+  ];
+  const cards=metrics.map(([label,key,info])=>{
+    const ranked=DATA.players.filter(p=>Number.isFinite(advancedMetricValue(p,key))).slice().sort((a,b)=>advancedMetricValue(b,key)-advancedMetricValue(a,key));
+    const leader=ranked[0],value=leader?advancedMetricValue(leader,key):null,[tier,tierClass]=metricTier(value);
+    return `<a class="advanced-leader-card" href="${leader?`#scorecard/${encodeURIComponent(leader.slug)}`:'#statistics'}"><div class="advanced-leader-head"><span>${parameterLabel(label,info)}</span><em class="metric-tier ${tierClass}">${tier}</em></div>${leader?`${avatarImg(leader.name,'advanced-leader-avatar',leader.name)}<div class="advanced-leader-player"><strong>${escapeHtml(leader.name)}</strong><small>Current leader</small></div><b>${Number(value).toFixed(1)}</b>`:'<div class="notice">Awaiting verified evidence</div>'}</a>`;
+  }).join('');
+  return `<section class="advanced-overview"><div class="section-heading"><div><span class="eyebrow">Live Supabase Analytics</span><h2 class="section-title">Advanced Metrics Leaders</h2><p class="muted">Six independent performance dimensions. Ranking and rating remain separate official measures.</p></div>${badge('20-player coverage')}</div><div class="advanced-leader-grid">${cards}</div></section>`;
+}
+function advancedMetricsTable(){
+  const rows=DATA.players.slice().sort((a,b)=>a.rank-b.rank).map(p=>{
+    const values=[momentumScore(p),p.consistency,p.dominance,p.clutch,p.versatility,p.sos];
+    const cells=values.map(v=>{const [tier,tierClass]=metricTier(v);return `<td><strong>${Number.isFinite(Number(v))?Number(v).toFixed(1):'—'}</strong><span class="metric-tier ${tierClass}">${tier}</span></td>`;}).join('');
+    return `<tr class="advanced-metric-row" data-player-href="#scorecard/${encodeURIComponent(p.slug)}" tabindex="0"><td><span class="advanced-rank">#${p.rank}</span></td><td><a class="table-player" href="#scorecard/${encodeURIComponent(p.slug)}">${avatarImg(p.name,'',p.name)}${escapeHtml(p.name)}</a></td>${cells}<td class="row-action"><a href="#scorecard/${encodeURIComponent(p.slug)}">❯</a></td></tr>`;
+  }).join('');
+  return `<section class="panel advanced-table-panel"><div class="panel-head"><div><span class="eyebrow">Complete Field</span><h2>Advanced Metrics Matrix</h2></div>${badge(`${DATA.players.length} active players`)}</div><div class="scoreboard-hint"><span>Swipe horizontally to compare every metric</span><b>Tap a row ❯</b></div><div class="table-wrap"><table class="table advanced-metrics-table"><thead><tr><th>Rank</th><th>Player</th><th>${parameterLabel('Momentum','momentum')}</th><th>${parameterLabel('Consistency','consistency')}</th><th>${parameterLabel('Dominance','point-dominance')}</th><th>${parameterLabel('Clutch','clutch-performance')}</th><th>${parameterLabel('Versatility','partner-versatility')}</th><th>${parameterLabel('Schedule','schedule-strength')}</th><th class="row-action-head">❯</th></tr></thead><tbody>${rows}</tbody></table></div><div class="metric-scale"><span><i class="elite"></i>85–100 Elite</span><span><i class="excellent"></i>70–84 Excellent</span><span><i class="good"></i>55–69 Good</span><span><i class="average"></i>40–54 Average</span><span><i class="developing"></i>&lt;40 Developing</span></div></section>`;
+}
+
 function statistics(){
   const improved=leaderboard('ratingChange.rankMovement',true);
   const consistent=leaderboard('consistency');
@@ -500,7 +533,7 @@ function statistics(){
     ['Average Win Rate',pct(Number(DATA.kpis['Average Win Rate'])*100),'average-win-rate']
   ];
   const kpis=`<div class="grid stats stats-with-info">${kpiCards.map(([a,b,key])=>`<div class="stat"><div class="stat-label"><span>${escapeHtml(a)}</span>${infoButton(key)}</div><strong>${escapeHtml(b)}</strong></div>`).join('')}</div>`;
-  return `${title('Statistics Center','Leaderboards and performance indicators generated from the workbook dataset. Tap the information icon for the definition and interpretation of each parameter.')}${kpis}<div class="leaderboard-grid">${board('Top Movers',improved,p=>movementText(p),'Official snapshot movement','top-movers')}${board('Momentum Leaders',momentum,p=>momentumScore(p).toFixed(1),'Composite momentum','momentum-leaders')}${board('Most Consistent',consistent,p=>p.consistency.toFixed(1),'Consistency index','most-consistent')}${board('Highest Win Rate',win,p=>pct(p.winRate),'Minimum 6 matches','highest-win-rate')}${board('Most Dominant',dominant,p=>p.dominance.toFixed(1),'Dominance index','most-dominant')}${board('Clutch Leaders',clutch,p=>p.clutch.toFixed(1),'Clutch index','clutch-leaders')}${board('Most Versatile',versatile,p=>p.versatility.toFixed(1),'Partner versatility','most-versatile')}${board('Toughest Schedule',tough,p=>p.sos.toFixed(1),'Schedule strength','toughest-schedule')}${board('Best Partner Chemistry',partnerChemistry,p=>`${p.analysis.bestPartner.name} · +${Number(p.analysis.bestPartner.chemistryDelta||0).toFixed(1)}`,'Strongest partnership effect','best-partner-chemistry')}${board('Toughest Opponent',toughestOpponent,p=>`${p.analysis.hardestOpponent.name} · ${pct(p.analysis.hardestOpponent.winRate)}`,'Hardest head-to-head matchup','toughest-opponent')}</div><div class="notice"><strong>Data note:</strong> Top Movers uses approved snapshot-to-snapshot movement. The current workbook is the production baseline, so movement becomes meaningful after the next verified tournament import. Partner and opponent categories use the relationship data currently available in each player scorecard.</div>`;
+  return `${title('Statistics Center','Live leaderboards and advanced performance indicators. Tap the information icon for each definition and interpretation.')}${kpis}${advancedMetricsOverview()}${advancedMetricsTable()}<div class="section-heading"><div><span class="eyebrow">Specialist Views</span><h2 class="section-title">Performance Leaderboards</h2></div></div><div class="leaderboard-grid">${board('Top Movers',improved,p=>movementText(p),'Official snapshot movement','top-movers')}${board('Momentum Leaders',momentum,p=>momentumScore(p).toFixed(1),'Composite momentum','momentum-leaders')}${board('Most Consistent',consistent,p=>p.consistency.toFixed(1),'Consistency index','most-consistent')}${board('Highest Win Rate',win,p=>pct(p.winRate),'Minimum 6 matches','highest-win-rate')}${board('Most Dominant',dominant,p=>p.dominance.toFixed(1),'Dominance index','most-dominant')}${board('Clutch Leaders',clutch,p=>p.clutch.toFixed(1),'Clutch index','clutch-leaders')}${board('Most Versatile',versatile,p=>p.versatility.toFixed(1),'Partner versatility','most-versatile')}${board('Toughest Schedule',tough,p=>p.sos.toFixed(1),'Schedule strength','toughest-schedule')}${board('Best Partner Chemistry',partnerChemistry,p=>`${p.analysis.bestPartner.name} · +${Number(p.analysis.bestPartner.chemistryDelta||0).toFixed(1)}`,'Strongest partnership effect','best-partner-chemistry')}${board('Toughest Opponent',toughestOpponent,p=>`${p.analysis.hardestOpponent.name} · ${pct(p.analysis.hardestOpponent.winRate)}`,'Hardest head-to-head matchup','toughest-opponent')}</div><div class="notice"><strong>Data note:</strong> Top Movers uses approved snapshot-to-snapshot movement. The current workbook is the production baseline, so movement becomes meaningful after the next verified tournament import. Partner and opponent categories use the relationship data currently available in each player scorecard.</div>`;
 }
 
 function predictionModel(p){
