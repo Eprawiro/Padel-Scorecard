@@ -1,6 +1,7 @@
 'use strict';
 
 window.FLPR_LIVE = (() => {
+  const MIN_RELATIONSHIP_SAMPLE = 2;
   const cfg = window.FLPR_CONFIG || {};
   const base = String(cfg.supabaseUrl || '').replace(/\/$/, '');
   const key = String(cfg.supabaseAnonKey || '');
@@ -174,6 +175,27 @@ window.FLPR_LIVE = (() => {
     matches:num(row.matches_played),wins:num(row.wins),draws:num(row.draws),losses:num(row.losses),
     winRate:num(row.win_rate),pointDiffPerMatch:num(row.point_diff_per_match),chemistryDelta:num(row.chemistry_delta)
   };}
+  function verifiedRelationships(rows){
+    return rows.filter(row=>num(row.matches_played)>=MIN_RELATIONSHIP_SAMPLE);
+  }
+  function hardestOpponent(rows){
+    return verifiedRelationships(rows).slice().sort((a,b)=>
+      num(a.win_rate)-num(b.win_rate)
+      || num(a.point_diff_per_match)-num(b.point_diff_per_match)
+      || num(b.matches_played)-num(a.matches_played)
+      || num(b.losses)-num(a.losses)
+      || String(a.related_player_name||'').localeCompare(String(b.related_player_name||''))
+    )[0];
+  }
+  function favorableOpponent(rows){
+    return verifiedRelationships(rows).slice().sort((a,b)=>
+      num(b.win_rate)-num(a.win_rate)
+      || num(b.point_diff_per_match)-num(a.point_diff_per_match)
+      || num(b.matches_played)-num(a.matches_played)
+      || num(b.wins)-num(a.wins)
+      || String(a.related_player_name||'').localeCompare(String(b.related_player_name||''))
+    )[0];
+  }
   function liveNarrative(player){
     const metrics=[['clutch execution',player.clutch],['partner versatility',player.versatility],['schedule-adjusted performance',player.adjustedWinRate],['consistency',player.consistency]].filter(([,value])=>value!==null&&value!==undefined&&Number.isFinite(Number(value)));
     const strongest=metrics.slice().sort((a,b)=>Number(b[1])-Number(a[1]))[0]||['verified performance','—'];
@@ -192,8 +214,11 @@ window.FLPR_LIVE = (() => {
       const all=byPlayer.get(player.id)||[],partners=all.filter(x=>x.relationship_type==='partner'),opponents=all.filter(x=>x.relationship_type==='opponent');
       const best=partners.slice().sort((a,b)=>num(b.chemistry_delta)-num(a.chemistry_delta)||num(b.matches_played)-num(a.matches_played))[0];
       const challenging=partners.slice().sort((a,b)=>num(a.chemistry_delta)-num(b.chemistry_delta)||num(b.matches_played)-num(a.matches_played))[0];
-      const hardest=opponents.slice().sort((a,b)=>num(a.win_rate)-num(b.win_rate)||num(a.point_diff_per_match)-num(b.point_diff_per_match)||num(b.matches_played)-num(a.matches_played))[0];
-      const favorable=opponents.slice().sort((a,b)=>num(b.win_rate)-num(a.win_rate)||num(b.point_diff_per_match)-num(a.point_diff_per_match)||num(b.matches_played)-num(a.matches_played))[0];
+      // A single encounter is not enough to label somebody a player's toughest
+      // or most favorable opponent. Keep the insight transparent until at least
+      // two completed head-to-head matches exist.
+      const hardest=hardestOpponent(opponents);
+      const favorable=favorableOpponent(opponents);
       player.analysis={...(player.analysis||{}),...liveNarrative(player),bestPartner:best?relationshipObject(best):null,challengingPartner:challenging?relationshipObject(challenging):null,hardestOpponent:hardest?relationshipObject(hardest):null,favorableOpponent:favorable?relationshipObject(favorable):null,dataSource:'LIVE SUPABASE'};
       player.liveRelationships=all.length;
     }
