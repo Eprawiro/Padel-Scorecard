@@ -38,6 +38,18 @@ After deploying the flat package to GitHub `main` and waiting for Netlify:
 5. Confirm the four KPI cards use a two-column mobile layout.
 6. Confirm all Phase 5.2A advanced leaderboards still load.
 
+### Verified production result
+
+- Live Supabase profiles: 20
+- Average Rating: 51.05
+- Rating Spread: 57.91
+- Competitive Balance Index: 78.83
+- Average Win Rate: 41.5%
+- Desktop/live SQL parity: passed
+- Mobile 2 x 2 KPI layout: passed
+- Horizontal overflow: none observed
+- Phase 5.2A advanced leaderboards: preserved
+
 ## Architecture boundary
 
 Phase 5.2B is a zero-regression Statistics Center refinement. Multi-community isolation is reserved for Phase 5.3; Jaksel T1-T6 remains the stable flagship baseline.
