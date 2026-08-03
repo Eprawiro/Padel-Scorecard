@@ -34,6 +34,14 @@
 1. Run `PHASE_5_2A_LIVE_RELATIONSHIP_VIEW.sql` in Supabase SQL Editor.
 2. Run `PHASE_5_2A_ADVANCED_METRIC_PREVIEW.sql` and validate the preview.
 3. Run `PHASE_5_2A_ACTIVATE_LIVE_ADVANCED_METRICS.sql`; expected coverage is `20 / 19 / 20 / 20`.
+   - Existing installations that used the original `security_invoker` projection should also run `PHASE_5_2A_REST_PERMISSION_HOTFIX.sql`.
 4. Upload all ZIP contents to the root of `Eprawiro/Padel-Scorecard`.
 5. Commit to `main` and wait for Netlify.
 6. Validate Statistics Center, Pairing & Rivalries, and Edy SP Player Scorecard.
+
+## Production verification
+
+- Supabase SQL validation passed.
+- Public REST access passed after the permission hotfix.
+- Edy SP live metrics verified: Momentum 38.0, Consistency 95.2, Dominance 44.1, Clutch 42.1, Versatility 47.3, Schedule Strength 53.1.
+- Advanced leaderboards verified: Most Dominant, Clutch Leaders, Most Versatile, and Toughest Schedule.

@@ -1,5 +1,5 @@
--- FLPR Phase 5.2A — Activate validated dynamic advanced metrics
--- Depends on v_flpr_advanced_metric_preview revision 2.
+-- FLPR Phase 5.2A — REST permission hotfix
+-- Fixes zero/fallback advanced metrics in the public frontend.
 
 begin;
 
