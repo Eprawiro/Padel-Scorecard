@@ -242,3 +242,8 @@
   .stats{grid-template-columns:1fr}
   .scorecard-actions{grid-template-columns:1fr}
 }
+
+/* FLPR Phase 5.2B — Statistics Center audit and mobile polish */
+.statistics-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.statistics-source{display:flex;align-items:center;gap:12px;margin:0 0 16px;padding:12px 14px;border:1px solid rgba(83,209,139,.3);border-radius:14px;background:rgba(83,209,139,.06)}.statistics-source p{margin:0;color:var(--muted);font-size:.85rem}.statistics-kpis .stat{min-width:0}.statistics-kpis .stat strong{overflow-wrap:anywhere}
+@media(max-width:760px){.statistics-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.statistics-source{align-items:flex-start;display:grid}.leaderboard-grid{grid-template-columns:1fr}}
+@media(max-width:430px){.statistics-kpis{gap:9px}.statistics-kpis .stat{padding:13px 8px}.statistics-kpis .stat strong{font-size:1.2rem}}
