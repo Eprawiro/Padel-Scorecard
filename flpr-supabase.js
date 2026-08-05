@@ -81,6 +81,15 @@ window.FLPR_LIVE = (() => {
     const bySlug=new Map(snapshotPlayers.map(p=>[p.slug,p]));
     return rows.map(r=>mergePlayer(r,bySlug.get(r.slug)));
   }
+  async function loadChampionshipRanking(){
+    const cols='championship_rank,player_id,display_name,championship_eligibility,rolling_appearances,championships,podiums,best_finish,raw_rolling_points,confidence_factor,inactivity_factor,championship_score,flpr_rating_tiebreak,latest_event_date';
+    try{
+      return await rest(`v_flpr_championship_ranking_v1?select=${encodeURIComponent(cols)}&order=championship_rank.asc`);
+    }catch(error){
+      console.warn('Championship Ranking shadow view unavailable; official FLPR ranking remains active.',error);
+      return [];
+    }
+  }
   async function loadTournaments(){
     const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url,cover_photo_url';
     const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.asc`);
@@ -262,7 +271,7 @@ window.FLPR_LIVE = (() => {
     }
   }
   async function hydrate(snapshot){
-    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics(),loadRelationships(),loadOfficialHistories(),loadAdvancedMetrics()]);
+    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics(),loadRelationships(),loadOfficialHistories(),loadAdvancedMetrics(),loadChampionshipRanking()]);
     applyAdvancedMetrics(players,advancedMetrics);
     applyRelationships(players,relationships);
     for(const player of players){
@@ -319,7 +328,8 @@ window.FLPR_LIVE = (() => {
       kpis,players,
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
       live:{ok:true,players:players.length,tournaments:tournaments.length,relationships:relationships.length,advancedMetrics:advancedMetrics.length,ratingHistory:officialHistories.ratings.length,handicapHistory:officialHistories.handicaps.length,loadedAt:new Date().toISOString()},
-      tournaments
+      tournaments,
+      championshipRanking
     };
   }
   return { enabled, hydrate };
