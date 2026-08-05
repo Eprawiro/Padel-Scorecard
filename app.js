@@ -316,6 +316,33 @@ function tournamentStats(t){
   return `<div class="tournament-insights">${stats([['Players',players],['Total Points',Number.isFinite(total)?total:'—'],['Average Points',avg===null?'—':avg.toFixed(1)],['Podium Spread',spreadDisplay]])}${detailCards}</div>`;
 }
 
+function matchTeamNames(players=[]){return players.length?players.map(escapeHtml).join(' <span>&amp;</span> '):'Players pending';}
+function verifiedMatchComplete(match){
+  if(match?.status!=='completed'||match.scoreA===null||match.scoreB===null)return false;
+  return Number(match.scoreA)!==0||Number(match.scoreB)!==0;
+}
+function matchStatus(match){
+  const completed=verifiedMatchComplete(match);
+  if(match?.status==='completed'&&!completed)return {label:'Unplayed',className:'scheduled'};
+  if(!completed)return {label:match?.status?String(match.status).replaceAll('_',' '):'Scheduled',className:'scheduled'};
+  const a=Number(match.scoreA),b=Number(match.scoreB);
+  if(a===b)return {label:'Draw',className:'draw'};
+  return {label:'Completed',className:'completed'};
+}
+function matchCard(match){
+  const state=matchStatus(match),a=Number(match.scoreA),b=Number(match.scoreB),hasScore=match.scoreA!==null&&match.scoreB!==null;
+  const aWinner=hasScore&&a>b,bWinner=hasScore&&b>a;
+  const court=match.court?` · ${escapeHtml(match.court)}`:'';
+  return `<article class="match-explorer-card"><header><strong>Match ${Number(match.matchNumber)||'—'}</strong><span>Round ${Number(match.round)||'—'}${court}</span><em class="match-status ${state.className}">${escapeHtml(state.label)}</em></header><div class="match-team ${aWinner?'winner':''}"><div><small>Team A</small><strong>${matchTeamNames(match.teamA)}</strong></div><b>${hasScore?a:'—'}</b></div><div class="match-team ${bWinner?'winner':''}"><div><small>Team B</small><strong>${matchTeamNames(match.teamB)}</strong></div><b>${hasScore?b:'—'}</b></div></article>`;
+}
+function matchExplorer(t){
+  const matches=Array.isArray(t?.matchDetails)?t.matchDetails:[];
+  if(!matches.length)return '';
+  const completed=matches.filter(verifiedMatchComplete).length;
+  const rounds=[...new Set(matches.map(match=>Number(match.round)||0))].sort((a,b)=>a-b);
+  return `<details class="tournament-match-explorer"><summary><span><strong>Match Explorer</strong><small>Round-by-round teams and verified scores</small></span><b>${completed}/${matches.length} completed</b></summary><div class="match-round-list">${rounds.map(round=>`<section class="match-round"><h3>Round ${round||'—'}</h3><div class="match-explorer-grid">${matches.filter(match=>(Number(match.round)||0)===round).map(matchCard).join('')}</div></section>`).join('')}</div></details>`;
+}
+
 function championHistory(){
   return `<section class="panel"><div class="panel-head"><h2>Champion History</h2>${badge('Verified results only')}</div><div class="champion-history">${getTournaments().map((t,index)=>`<div class="champion-row"><div><b>${escapeHtml(tournamentDisplayName(t,index))}</b><span>${escapeHtml(t.date)}</span></div>${t.players?`<img src="${avatar(t.podium[0][0])}" alt="${escapeHtml(t.podium[0][0])}"><strong>${escapeHtml(t.podium[0][0])}</strong><em>${t.podium[0][1]} pts</em>`:`<strong class="pending-text">Awaiting verified import</strong>`}</div>`).join('')}</div></section>`;
 }
@@ -327,7 +354,7 @@ function tournamentComparison(){const verified=getTournaments().filter(t=>t.play
 
 function tournaments(){
   const newestFirst=getTournaments().slice().reverse();
-  return `${title('Tournament Center','Tournament summaries, podiums, statistics, and champion history.')}${tournamentIntelligence()}<div class="tournament-list">${newestFirst.map((t,index)=>`<article class="tournament-card">${tournamentCover(t)}<div class="eyebrow">${index===0?'Latest Tournament':'Historical Tournament'}</div><h2>${escapeHtml(t.name)}</h2><div class="tournament-meta">${escapeHtml(t.location)} · ${escapeHtml(t.date)} · ${escapeHtml(t.format)}${t.courts?` · ${t.courts} Courts`:''}</div>${t.players?`${Array.isArray(t.podium)&&t.podium.length>=3?podium(t.podium):''}${tournamentStats(t)}`:tournamentStats(t)}</article>`).join('')}</div><section class="panel"><div class="panel-head"><h2>Tournament Records</h2>${badge('Verified data')}</div>${tournamentRecords()}</section>${tournamentComparison()}${championHistory()}`;
+  return `${title('Tournament Center','Tournament summaries, podiums, statistics, and champion history.')}${tournamentIntelligence()}<div class="tournament-list">${newestFirst.map((t,index)=>`<article class="tournament-card">${tournamentCover(t)}<div class="eyebrow">${index===0?'Latest Tournament':'Historical Tournament'}</div><h2>${escapeHtml(t.name)}</h2><div class="tournament-meta">${escapeHtml(t.location)} · ${escapeHtml(t.date)} · ${escapeHtml(t.format)}${t.courts?` · ${t.courts} Courts`:''}</div>${t.players?`${Array.isArray(t.podium)&&t.podium.length>=3?podium(t.podium):''}${tournamentStats(t)}${matchExplorer(t)}`:tournamentStats(t)}</article>`).join('')}</div><section class="panel"><div class="panel-head"><h2>Tournament Records</h2>${badge('Verified data')}</div>${tournamentRecords()}</section>${tournamentComparison()}${championHistory()}`;
 }
 
 function scoreboard(){

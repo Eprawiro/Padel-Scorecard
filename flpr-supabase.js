@@ -84,13 +84,22 @@ window.FLPR_LIVE = (() => {
   async function loadTournaments(){
     const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url,cover_photo_url';
     const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.asc`);
-    let entries=[];
+    let entries=[],matches=[],matchPlayers=[];
     try{
       // Load every tournament standing, not only the top three. The complete
       // set is required to calculate tournament total and average points.
-      const tpcols='tournament_id,player_id,final_position,total_points,players(display_name)';
+      const tpcols='id,tournament_id,player_id,source_player_name,final_position,total_points,players(display_name)';
       entries=await rest(`tournament_players?select=${encodeURIComponent(tpcols)}&order=final_position.asc`);
     }catch(error){ console.warn('Tournament standings query unavailable',error); }
+    try{
+      const matchCols='id,tournament_id,round_number,court_label,match_number,team_a_score,team_b_score,status';
+      const playerCols='match_id,tournament_player_id,team_no,team_slot,result';
+      [matches,matchPlayers]=await Promise.all([
+        rest(`matches?select=${encodeURIComponent(matchCols)}&order=round_number.asc,match_number.asc`),
+        rest(`match_players?select=${encodeURIComponent(playerCols)}&order=team_no.asc,team_slot.asc`)
+      ]);
+    }catch(error){ console.warn('Match Explorer data unavailable; tournament summaries remain active.',error); }
+    const tournamentPlayerById=new Map(entries.map(row=>[row.id,row]));
     return tournaments.map((t,index)=>{
       const standings=entries
         .filter(x=>x.tournament_id===t.id)
@@ -101,6 +110,32 @@ window.FLPR_LIVE = (() => {
         .slice(0,3);
       const totalPoints=standings.reduce((sum,x)=>sum+num(x.total_points),0);
       const playerCount=num(t.player_count,standings.length) || standings.length;
+      const matchDetails=matches
+        .filter(match=>match.tournament_id===t.id)
+        .sort((a,b)=>num(a.round_number,999)-num(b.round_number,999)||num(a.match_number,999)-num(b.match_number,999))
+        .map((match,matchIndex)=>{
+          const participants=matchPlayers
+            .filter(row=>row.match_id===match.id)
+            .map(row=>{
+              const tournamentPlayer=tournamentPlayerById.get(row.tournament_player_id);
+              return {
+                team:num(row.team_no),slot:num(row.team_slot),result:String(row.result||''),
+                name:tournamentPlayer?.players?.display_name||tournamentPlayer?.source_player_name||'Unknown Player'
+              };
+            })
+            .sort((a,b)=>a.team-b.team||a.slot-b.slot);
+          return {
+            id:match.id,
+            round:num(match.round_number,matchIndex+1),
+            matchNumber:num(match.match_number,matchIndex+1),
+            court:match.court_label||'',
+            status:String(match.status||'').toLowerCase(),
+            scoreA:match.team_a_score==null?null:num(match.team_a_score),
+            scoreB:match.team_b_score==null?null:num(match.team_b_score),
+            teamA:participants.filter(row=>row.team===1).map(row=>row.name),
+            teamB:participants.filter(row=>row.team===2).map(row=>row.name)
+          };
+        });
       return {
         id:t.source_tournament_id || `T${index+1}`,
         sourceTournamentId:t.source_tournament_id,
@@ -114,6 +149,7 @@ window.FLPR_LIVE = (() => {
         averagePoints:playerCount ? totalPoints/playerCount : null,
         podium,
         standings:standings.map(x=>({playerId:x.player_id,name:x.players?.display_name||'Player',finalPosition:num(x.final_position,999),totalPoints:num(x.total_points)})),
+        matchDetails,
         status:'Published · Live Supabase',sourceUrl:t.source_url,
         coverPhotoUrl:t.cover_photo_url||null,
         live:true
