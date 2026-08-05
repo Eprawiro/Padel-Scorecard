@@ -90,6 +90,15 @@ window.FLPR_LIVE = (() => {
       return [];
     }
   }
+  async function loadChampionshipBreakdown(){
+    const cols='championship_rank,player_id,display_name,championship_eligibility,rolling_appearances,appearances_to_eligible,raw_rolling_points,confidence_factor,inactivity_factor,championship_score,tournament_id,tournament_name,event_date,recency_number,field_size,final_position,finish_band,participation_points,finish_bonus,field_size_multiplier,raw_event_points,weighted_event_contribution';
+    try{
+      return await rest(`v_flpr_championship_event_breakdown_v1?select=${encodeURIComponent(cols)}&order=event_date.desc`);
+    }catch(error){
+      console.warn('Championship explainability view unavailable; player scorecards remain active.',error);
+      return [];
+    }
+  }
   async function loadTournaments(){
     const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url,cover_photo_url';
     const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.asc`);
@@ -271,10 +280,12 @@ window.FLPR_LIVE = (() => {
     }
   }
   async function hydrate(snapshot){
-    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics(),loadRelationships(),loadOfficialHistories(),loadAdvancedMetrics(),loadChampionshipRanking()]);
+    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking,championshipBreakdown]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics(),loadRelationships(),loadOfficialHistories(),loadAdvancedMetrics(),loadChampionshipRanking(),loadChampionshipBreakdown()]);
     applyAdvancedMetrics(players,advancedMetrics);
     applyRelationships(players,relationships);
     for(const player of players){
+      player.championshipRanking=championshipRanking.find(row=>row.player_id===player.id)||null;
+      player.championshipEvents=championshipBreakdown.filter(row=>row.player_id===player.id);
       const analytics=historical.get(player.id);
       player.ratingHistory=officialHistories.ratings.filter(x=>x.player_id===player.id);
       player.handicapHistory=officialHistories.handicaps.filter(x=>x.player_id===player.id);
