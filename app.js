@@ -49,6 +49,16 @@ function escapeHtml(value=''){return String(value).replace(/[&<>'"]/g,c=>({'&':'
 function slugify(v=''){return String(v).toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function avatar(name){return PHOTO[slugify(name)] || 'generic-padel-avatar.svg';}
 function avatarImg(name,cls='',alt=''){return `<img${cls?` class="${escapeHtml(cls)}"`:''} src="${avatar(name)}" alt="${escapeHtml(alt||name)}" loading="lazy" onerror="this.onerror=null;this.src='generic-padel-avatar.svg'">`;}
+function safeMediaUrl(value=''){
+  const raw=String(value||'').trim();
+  if(!raw)return '';
+  try{const url=new URL(raw,location.href);return url.protocol==='https:'?url.href:'';}catch{return '';}
+}
+function tournamentCover(t){
+  const src=safeMediaUrl(t?.coverPhotoUrl||t?.cover_photo_url);
+  if(!src)return '';
+  return `<figure class="tournament-cover"><img src="${escapeHtml(src)}" alt="${escapeHtml(`${t.name||'Tournament'} cover photo`)}" loading="lazy" onerror="this.closest('figure').hidden=true"></figure>`;
+}
 function panelTitle(label,key){return `<div class="panel-title-with-info"><h3>${escapeHtml(label)}</h3>${infoButton(key)}</div>`;}
 function route(){const raw=location.hash.replace(/^#/,'')||'home';const [name,param]=raw.split('/');return {name:ROUTES.some(r=>r[0]===name)?name:'home',param:decodeURIComponent(param||'')};}
 function navLink(id,label){return `<a href="#${id}" data-route="${id}">${label}</a>`;}
@@ -317,7 +327,7 @@ function tournamentComparison(){const verified=getTournaments().filter(t=>t.play
 
 function tournaments(){
   const newestFirst=getTournaments().slice().reverse();
-  return `${title('Tournament Center','Tournament summaries, podiums, statistics, and champion history.')}${tournamentIntelligence()}<div class="tournament-list">${newestFirst.map((t,index)=>`<article class="tournament-card"><div class="eyebrow">${index===0?'Latest Tournament':'Historical Tournament'}</div><h2>${escapeHtml(t.name)}</h2><div class="tournament-meta">${escapeHtml(t.location)} · ${escapeHtml(t.date)} · ${escapeHtml(t.format)}${t.courts?` · ${t.courts} Courts`:''}</div>${t.players?`${Array.isArray(t.podium)&&t.podium.length>=3?podium(t.podium):''}${tournamentStats(t)}`:tournamentStats(t)}</article>`).join('')}</div><section class="panel"><div class="panel-head"><h2>Tournament Records</h2>${badge('Verified data')}</div>${tournamentRecords()}</section>${tournamentComparison()}${championHistory()}`;
+  return `${title('Tournament Center','Tournament summaries, podiums, statistics, and champion history.')}${tournamentIntelligence()}<div class="tournament-list">${newestFirst.map((t,index)=>`<article class="tournament-card">${tournamentCover(t)}<div class="eyebrow">${index===0?'Latest Tournament':'Historical Tournament'}</div><h2>${escapeHtml(t.name)}</h2><div class="tournament-meta">${escapeHtml(t.location)} · ${escapeHtml(t.date)} · ${escapeHtml(t.format)}${t.courts?` · ${t.courts} Courts`:''}</div>${t.players?`${Array.isArray(t.podium)&&t.podium.length>=3?podium(t.podium):''}${tournamentStats(t)}`:tournamentStats(t)}</article>`).join('')}</div><section class="panel"><div class="panel-head"><h2>Tournament Records</h2>${badge('Verified data')}</div>${tournamentRecords()}</section>${tournamentComparison()}${championHistory()}`;
 }
 
 function scoreboard(){

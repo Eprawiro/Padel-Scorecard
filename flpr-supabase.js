@@ -82,7 +82,7 @@ window.FLPR_LIVE = (() => {
     return rows.map(r=>mergePlayer(r,bySlug.get(r.slug)));
   }
   async function loadTournaments(){
-    const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url';
+    const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url,cover_photo_url';
     const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.asc`);
     let entries=[];
     try{
@@ -114,7 +114,9 @@ window.FLPR_LIVE = (() => {
         averagePoints:playerCount ? totalPoints/playerCount : null,
         podium,
         standings:standings.map(x=>({playerId:x.player_id,name:x.players?.display_name||'Player',finalPosition:num(x.final_position,999),totalPoints:num(x.total_points)})),
-        status:'Published · Live Supabase',sourceUrl:t.source_url,live:true
+        status:'Published · Live Supabase',sourceUrl:t.source_url,
+        coverPhotoUrl:t.cover_photo_url||null,
+        live:true
       };
     });
   }
