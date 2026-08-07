@@ -99,6 +99,15 @@ window.FLPR_LIVE = (() => {
       return [];
     }
   }
+  async function loadChampionshipHistory(){
+    const cols='community_id,tournament_id,player_id,snapshot_key,championship_rank,previous_rank,rank_movement,championship_score,previous_score,score_change,championship_eligibility,rolling_appearances,snapshot_source,captured_at';
+    try{
+      return await rest(`flpr_championship_ranking_history?select=${encodeURIComponent(cols)}&calculation_version=eq.championship-v1&order=captured_at.desc`);
+    }catch(error){
+      console.warn('Championship history unavailable; current Championship Ranking remains active.',error);
+      return [];
+    }
+  }
   async function loadTournaments(){
     const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url,cover_photo_url';
     const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.asc`);
@@ -280,11 +289,19 @@ window.FLPR_LIVE = (() => {
     }
   }
   async function hydrate(snapshot){
-    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking,championshipBreakdown]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics(),loadRelationships(),loadOfficialHistories(),loadAdvancedMetrics(),loadChampionshipRanking(),loadChampionshipBreakdown()]);
+    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking,championshipBreakdown,championshipHistory]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics(),loadRelationships(),loadOfficialHistories(),loadAdvancedMetrics(),loadChampionshipRanking(),loadChampionshipBreakdown(),loadChampionshipHistory()]);
+    const championshipSnapshots=[...new Set(championshipHistory.map(row=>row.snapshot_key).filter(Boolean))];
+    const latestChampionshipHistory=new Map();
+    for(const row of championshipHistory){if(!latestChampionshipHistory.has(row.player_id))latestChampionshipHistory.set(row.player_id,row);}
+    for(const row of championshipRanking){
+      row.history=latestChampionshipHistory.get(row.player_id)||null;
+      row.snapshot_count=championshipSnapshots.length;
+    }
     applyAdvancedMetrics(players,advancedMetrics);
     applyRelationships(players,relationships);
     for(const player of players){
       player.championshipRanking=championshipRanking.find(row=>row.player_id===player.id)||null;
+      player.championshipHistory=championshipHistory.filter(row=>row.player_id===player.id).sort((a,b)=>String(a.captured_at).localeCompare(String(b.captured_at)));
       player.championshipEvents=championshipBreakdown.filter(row=>row.player_id===player.id);
       const analytics=historical.get(player.id);
       player.ratingHistory=officialHistories.ratings.filter(x=>x.player_id===player.id);
@@ -340,7 +357,9 @@ window.FLPR_LIVE = (() => {
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
       live:{ok:true,players:players.length,tournaments:tournaments.length,relationships:relationships.length,advancedMetrics:advancedMetrics.length,ratingHistory:officialHistories.ratings.length,handicapHistory:officialHistories.handicaps.length,loadedAt:new Date().toISOString()},
       tournaments,
-      championshipRanking
+      championshipRanking,
+      championshipHistory,
+      championshipSnapshotCount:championshipSnapshots.length
     };
   }
   return { enabled, hydrate };

@@ -183,6 +183,7 @@ Object.assign(STAT_INFO, {
   ,'championship-breakdown': {title:'Championship Score Breakdown',definition:'A transparent per-tournament explanation of the player’s current Championship Score.',formula:'Raw event points = participation point + (finish bonus × field-size multiplier). Championship Score = total raw event points × confidence factor × inactivity factor.',interpretation:'The breakdown is read-only and covers only the latest eight published tournaments in the player’s community.'}
   ,'championship-confidence': {title:'Championship Confidence Factor',definition:'A sample-size protection factor based on rolling tournament appearances.',formula:'1 appearance: 0.55; 2: 0.70; 3: 0.82; 4: 0.92; 5 or more: 1.00.',interpretation:'It prevents a very small tournament sample from immediately dominating the official Championship Ranking.'}
   ,'championship-inactivity': {title:'Championship Inactivity Factor',definition:'A gradual adjustment for players who have not appeared recently.',formula:'1.00 during the first 90 inactive days, then minus 0.05 for each additional 30 days, with a maximum reduction of 30%.',interpretation:'Current active players normally remain at 1.00. The factor never falls below 0.70.'}
+  ,'championship-movement': {title:'Championship Movement',definition:'The verified change between the two latest stored Championship Ranking snapshots.',formula:'Rank movement = previous rank − current rank. Score change = current Championship Score − previous Championship Score.',interpretation:'▲ means promotion, ▼ means a lower rank, — means unchanged, and NEW means the player has no prior Championship snapshot. A single stored snapshot is labeled BASELINE, never movement zero.'}
 });
 Object.assign(STAT_INFO, {
   'verified-tournaments': {title:'Verified Tournaments',definition:'Published tournaments with a complete player field and an official podium available to the dashboard.',formula:'COUNT(tournaments where player count > 0 and podium data exists).',interpretation:'This is the tournament sample used by the Tournament Intelligence overview.'},
@@ -254,18 +255,39 @@ function rankingCriteria(){
 }
 
 function championshipEligibilityBadge(status){const value=String(status||'PROVISIONAL').toUpperCase();return `<span class="championship-status ${value.toLowerCase()}">${escapeHtml(value)}</span>`;}
+function championshipMovementState(row){
+  const history=row?.history||null,snapshotCount=Number(row?.snapshot_count??DATA.championshipSnapshotCount??0);
+  const previousRank=history?.previous_rank==null?null:Number(history.previous_rank);
+  const movement=history?.rank_movement==null?null:Number(history.rank_movement);
+  const scoreChange=history?.score_change==null?null:Number(history.score_change);
+  if(snapshotCount<=1)return {type:'baseline',label:'BASELINE',detail:'Movement starts after T8',previousRank:null,movement:null,scoreChange:null};
+  if(previousRank===null)return {type:'new',label:'NEW',detail:'First Championship snapshot',previousRank:null,movement:null,scoreChange};
+  if(movement>0)return {type:'up',label:`▲ ${movement}`,detail:`From #${previousRank}`,previousRank,movement,scoreChange};
+  if(movement<0)return {type:'down',label:`▼ ${Math.abs(movement)}`,detail:`From #${previousRank}`,previousRank,movement,scoreChange};
+  return {type:'same',label:'—',detail:`Remains #${Number(row.championship_rank||history?.championship_rank||0)}`,previousRank,movement:0,scoreChange};
+}
+function championshipMovementCell(row){
+  const state=championshipMovementState(row);
+  const score=state.scoreChange==null?'Awaiting comparison':`${state.scoreChange>0?'+':''}${state.scoreChange.toFixed(2)} score`;
+  return `<span class="championship-cell championship-movement ${state.type}"><small>Movement</small><strong>${escapeHtml(state.label)}</strong><em>${escapeHtml(state.type==='baseline'?state.detail:score)}</em></span>`;
+}
 function championshipRankingRow(row){
   const player=DATA.players.find(p=>p.id===row.player_id||p.name===row.display_name);
   const href=player?`#scorecard/${encodeURIComponent(player.slug)}`:'#scorecard';
   const rank=Number(row.championship_rank||0),best=Number(row.best_finish||0);
-  return `<a class="championship-row" href="${href}"><span class="championship-rank">#${rank||'—'}</span>${avatarImg(row.display_name,'ranking-avatar',row.display_name)}<span class="championship-player"><strong>${escapeHtml(row.display_name)}</strong><small>${championshipEligibilityBadge(row.championship_eligibility)} · ${Number(row.rolling_appearances||0)} of last 8 tournaments</small></span><span class="championship-cell"><small>Score</small><strong>${Number(row.championship_score||0).toFixed(2)}</strong></span><span class="championship-cell"><small>Titles</small><strong>${Number(row.championships||0)}</strong></span><span class="championship-cell"><small>Podiums</small><strong>${Number(row.podiums||0)}</strong></span><span class="championship-cell"><small>Best</small><strong>${best?`#${best}`:'—'}</strong></span></a>`;
+  return `<a class="championship-row" href="${href}"><span class="championship-rank">#${rank||'—'}</span>${avatarImg(row.display_name,'ranking-avatar',row.display_name)}<span class="championship-player"><strong>${escapeHtml(row.display_name)}</strong><small>${championshipEligibilityBadge(row.championship_eligibility)} · ${Number(row.rolling_appearances||0)} of last 8 tournaments</small></span>${championshipMovementCell(row)}<span class="championship-cell championship-score"><small>Score</small><strong>${Number(row.championship_score||0).toFixed(2)}</strong></span><span class="championship-cell championship-titles"><small>Titles</small><strong>${Number(row.championships||0)}</strong></span><span class="championship-cell championship-podiums"><small>Podiums</small><strong>${Number(row.podiums||0)}</strong></span><span class="championship-cell championship-best"><small>Best</small><strong>${best?`#${best}`:'—'}</strong></span></a>`;
 }
 function championshipRankingPanel(){
   const rows=Array.isArray(DATA.championshipRanking)?DATA.championshipRanking:[];
   if(!rows.length)return `<section class="panel championship-shadow"><div class="panel-head"><div><span class="eyebrow">Dual Ranking · Read-only shadow model</span><h2>Championship Ranking v1</h2></div>${infoButton('championship-ranking')}</div><div class="notice">Championship Ranking database view is awaiting activation. The official FLPR Ranking below remains unchanged.</div></section>`;
   const official=rows.filter(r=>String(r.championship_eligibility).toUpperCase()==='ELIGIBLE');
   const watch=rows.filter(r=>String(r.championship_eligibility).toUpperCase()!=='ELIGIBLE');
-  return `<section class="panel championship-shadow"><div class="panel-head"><div><span class="eyebrow">Dual Ranking · Read-only shadow model</span><h2>Championship Ranking v1</h2><p>Achievement and participation ranking for the latest eight community tournaments.</p></div><div class="championship-head-actions">${infoButton('championship-ranking')}${badge('SHADOW · NO DATABASE WRITES')}</div></div><div class="championship-separation"><strong>Separate from FLPR Rating</strong><span>FLPR Rating measures playing strength. Championship Score measures tournament achievement and participation.</span></div><div class="championship-group"><div class="section-heading"><div><span class="eyebrow">5+ rolling appearances</span><h3>Official Championship Ranking</h3></div><span class="muted">${official.length} eligible</span></div><div class="championship-list">${official.length?official.map(championshipRankingRow).join(''):'<div class="notice">No player is eligible yet.</div>'}</div></div><details class="championship-watch"><summary><span><strong>Emerging & Provisional Watch</strong><small>Visible development path; not labeled official</small></span><b>${watch.length} players</b></summary><div class="championship-list">${watch.map(championshipRankingRow).join('')}</div></details><p class="chart-note">Rolling window: last 8 published community tournaments · 90-day inactivity grace · maximum decay 30% · FLPR Rating used only as a tie-break.</p></section>`;
+  const snapshotCount=Number(DATA.championshipSnapshotCount??rows[0]?.snapshot_count??0);
+  const movementReady=snapshotCount>=2;
+  const historyNotice=movementReady
+    ? `<div class="championship-history-status ready"><span>✓</span><div><strong>Verified Championship movement active</strong><p>${snapshotCount} stored snapshots · rank and score changes compare the latest two verified tournament publications.</p></div></div>`
+    : `<div class="championship-history-status baseline"><span>◷</span><div><strong>T7 is the official Championship baseline</strong><p>Movement will activate automatically after T8 creates the second verified snapshot. No synthetic zero movement is displayed.</p></div></div>`;
+  return `<section class="panel championship-shadow"><div class="panel-head"><div><span class="eyebrow">Dual Ranking · Read-only shadow model</span><h2>Championship Ranking v1</h2><p>Achievement and participation ranking for the latest eight community tournaments.</p></div><div class="championship-head-actions">${infoButton('championship-ranking')}${badge(movementReady?`LIVE MOVEMENT · ${snapshotCount} SNAPSHOTS`:'T7 VERIFIED BASELINE')}</div></div><div class="championship-separation"><strong>Separate from FLPR Rating</strong><span>FLPR Rating measures playing strength. Championship Score measures tournament achievement and participation.</span></div>${historyNotice}<div class="championship-group"><div class="section-heading"><div><span class="eyebrow">5+ rolling appearances</span><h3>Official Championship Ranking</h3></div><span class="muted">${official.length} eligible</span></div><div class="championship-list">${official.length?official.map(championshipRankingRow).join(''):'<div class="notice">No player is eligible yet.</div>'}</div></div><details class="championship-watch"><summary><span><strong>Emerging & Provisional Watch</strong><small>Visible development path; not labeled official</small></span><b>${watch.length} players</b></summary><div class="championship-list">${watch.map(championshipRankingRow).join('')}</div></details><p class="chart-note">Rolling window: last 8 published community tournaments · 90-day inactivity grace · maximum decay 30% · FLPR Rating used only as a tie-break.</p></section>`;
 }
 
 function rankingIntegrity(players){
@@ -520,7 +542,15 @@ function championshipEventLabel(event){
   const labels={CHAMPION:'Champion',RUNNER_UP:'Runner-up',THIRD_PLACE:'Third place',TOP_50:'Top 50%',TOP_70:'Top 70%',PARTICIPATION:'Participation'};
   return labels[String(event.finish_band||'').toUpperCase()]||'Verified finish';
 }
-function championshipExplainabilityPanel(p){
+function championshipScorecardMovement(ranking){
+  const state=championshipMovementState(ranking);
+  if(state.type==='baseline')return `<div class="championship-movement-summary baseline"><span>◷</span><div><small>Official T7 baseline</small><strong>Movement begins after the next verified Championship snapshot</strong><p>No synthetic zero movement is shown.</p></div></div>`;
+  const history=ranking.history||{};
+  const scoreChange=state.scoreChange==null?'—':`${state.scoreChange>0?'+':''}${state.scoreChange.toFixed(2)}`;
+  const previousScore=history.previous_score==null?'—':Number(history.previous_score).toFixed(2);
+  return `<div class="championship-movement-summary ${state.type}"><span>${escapeHtml(state.label)}</span><div><small>Verified Championship movement</small><strong>${escapeHtml(state.detail)} · Score ${escapeHtml(scoreChange)}</strong><p>Previous Championship Score: ${escapeHtml(previousScore)}</p></div></div>`;
+}
+function championshipExplainabilityPanelBase(p){
   const ranking=p.championshipRanking,events=Array.isArray(p.championshipEvents)?p.championshipEvents:[];
   if(!ranking||!events.length)return `<section class="score-panel panel championship-explain"><div class="panel-head">${panelTitle('Championship Ranking','championship-breakdown')}${badge('READ-ONLY SHADOW')}</div><div class="notice">The Championship Score breakdown is awaiting activation. FLPR Rating and the existing scorecard remain unchanged.</div></section>`;
   const appearances=Number(ranking.rolling_appearances||0),remaining=Math.max(0,5-appearances),progress=Math.min(100,appearances/5*100);
@@ -528,6 +558,12 @@ function championshipExplainabilityPanel(p){
   const eligibilityText=remaining?`${remaining} more rolling appearance${remaining===1?'':'s'} to reach ELIGIBLE`:'Official Championship eligibility reached';
   const rows=events.map(event=>`<div class="championship-event"><div class="championship-event-main"><span class="event-recency">T-${Number(event.recency_number||0)-1}</span><div><strong>${escapeHtml(event.tournament_name||'Verified tournament')}</strong><small>${escapeHtml(championshipEventLabel(event))} · Finish #${Number(event.final_position||0)} of ${Number(event.field_size||0)}</small></div></div><div><small>Participation</small><strong>+${Number(event.participation_points||0).toFixed(2)}</strong></div><div><small>Finish bonus</small><strong>+${Number(event.finish_bonus||0).toFixed(2)}</strong></div><div><small>Field ×</small><strong>${Number(event.field_size_multiplier||0).toFixed(2)}</strong></div><div><small>Raw points</small><strong>${Number(event.raw_event_points||0).toFixed(2)}</strong></div><div><small>Score contribution</small><strong>${Number(event.weighted_event_contribution||0).toFixed(2)}</strong></div></div>`).join('');
   return `<section class="score-panel panel championship-explain"><div class="panel-head"><div class="panel-title-with-info"><h3>Championship Ranking</h3>${infoButton('championship-breakdown')}</div>${badge('READ-ONLY SHADOW')}</div><div class="championship-explain-hero"><div><small>Championship Rank</small><strong>#${Number(ranking.championship_rank||0)}</strong></div><div><small>Championship Score</small><strong>${Number(ranking.championship_score||0).toFixed(2)}</strong></div><div><small>Status</small>${championshipEligibilityBadge(eligibility)}</div><div><small>Rolling appearances</small><strong>${appearances}/8</strong></div></div><div class="eligibility-progress"><div><span>${escapeHtml(eligibilityText)}</span><b>${Math.min(appearances,5)}/5</b></div><div class="metric-track"><i style="width:${progress}%"></i></div></div><div class="championship-factor-grid"><div>${parameterLabel('Raw rolling points','championship-breakdown')}<strong>${Number(ranking.raw_rolling_points||0).toFixed(2)}</strong></div><div>${parameterLabel('Confidence factor','championship-confidence')}<strong>× ${Number(ranking.confidence_factor||0).toFixed(2)}</strong></div><div>${parameterLabel('Inactivity factor','championship-inactivity')}<strong>× ${Number(ranking.inactivity_factor||0).toFixed(2)}</strong></div><div><span>Final calculation</span><strong>${Number(ranking.raw_rolling_points||0).toFixed(2)} × ${Number(ranking.confidence_factor||0).toFixed(2)} × ${Number(ranking.inactivity_factor||0).toFixed(2)} = ${Number(ranking.championship_score||0).toFixed(2)}</strong></div></div><details class="championship-event-details"><summary><span><strong>Points earned per tournament</strong><small>Participation, finish bonus, field multiplier, and contribution</small></span><b>${events.length} events</b></summary><div class="championship-events">${rows}</div></details><p class="chart-note">This panel explains Championship Ranking only. It does not alter FLPR Rating, Official FLPR Rank, or Handicap.</p></section>`;
+}
+
+function championshipExplainabilityPanel(p){
+  const html=championshipExplainabilityPanelBase(p);
+  if(!p.championshipRanking)return html;
+  return html.replace('<div class="eligibility-progress">',`${championshipScorecardMovement(p.championshipRanking)}<div class="eligibility-progress">`);
 }
 
 function scorecardDetail(p){
