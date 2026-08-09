@@ -215,9 +215,8 @@ window.FLPR_LIVE = (() => {
     }
   }
   async function loadRelationships(community){
-    if(!community.is_default)return [];
     const cols='player_id,related_player_id,related_player_name,relationship_type,matches_played,wins,draws,losses,win_rate,point_diff_per_match,chemistry_delta';
-    try{return await rest(`v_flpr_relationship_live?select=${encodeURIComponent(cols)}`);}
+    try{return await rest(`v_flpr_community_relationship_live?select=${encodeURIComponent(cols)}&community_id=eq.${community.id}`);}
     catch(error){console.warn('Live relationship view unavailable.',error);return [];}
   }
   async function loadOfficialHistories(community){
@@ -227,9 +226,8 @@ window.FLPR_LIVE = (() => {
     return result;
   }
   async function loadAdvancedMetrics(community){
-    if(!community.is_default)return [];
     const cols='player_id,clutch_matches,proposed_clutch,average_opponent_rating,proposed_schedule_strength,unique_partners,proposed_versatility,raw_momentum,proposed_momentum_index,raw_dominance,proposed_dominance_index';
-    try{return await rest(`v_flpr_advanced_metrics_live?select=${encodeURIComponent(cols)}`);}
+    try{return await rest(`v_flpr_community_advanced_metrics_live?select=${encodeURIComponent(cols)}&community_id=eq.${community.id}`);}
     catch(error){console.warn('Live advanced-metric view unavailable.',error);return [];}
   }
   function applyAdvancedMetrics(players,rows){
