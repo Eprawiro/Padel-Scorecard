@@ -194,13 +194,12 @@ window.FLPR_LIVE = (() => {
     });
   }
   async function loadHistoricalAnalytics(community){
-    if(!community.is_default)return new Map();
     try{
       const summaryCols='player_id,current_rank,previous_historical_rank,rank_change,trend_status,current_official_rating,previous_official_rating,rating_change,best_rank_ever,worst_rank_ever,average_rank,rank_volatility,number_one_snapshots,top_three_snapshots,top_three_rate,longest_improvement_streak,longest_stability_streak,longest_top3_streak,longest_number_one_streak,snapshot_count,career_rank_improvement,career_rating_change,career_trend_score,career_status,movement_direction,dashboard_tier,first_snapshot_at,latest_snapshot_at';
       const timelineCols='player_id,snapshot_key,snapshot_source,tournament_id,captured_at,rank,previous_historical_rank,rank_change,rank_trend,official_rating,previous_official_rating,rating_change,player_snapshot_number';
       const [summaries,timeline]=await Promise.all([
-        rest(`v_flpr_player_analytics_dashboard?select=${encodeURIComponent(summaryCols)}`),
-        rest(`v_flpr_ranking_history_timeline?select=${encodeURIComponent(timelineCols)}&order=captured_at.asc`)
+        rest(`v_flpr_community_player_analytics_dashboard?select=${encodeURIComponent(summaryCols)}&community_id=eq.${community.id}`),
+        rest(`v_flpr_community_ranking_history_timeline?select=${encodeURIComponent(timelineCols)}&community_id=eq.${community.id}&order=captured_at.asc`)
       ]);
       const byPlayer=new Map();
       for(const row of summaries) byPlayer.set(row.player_id,{summary:row,timeline:[]});
