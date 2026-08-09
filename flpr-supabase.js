@@ -5,6 +5,7 @@ window.FLPR_LIVE = (() => {
   const cfg = window.FLPR_CONFIG || {};
   const base = String(cfg.supabaseUrl || '').replace(/\/$/, '');
   const key = String(cfg.supabaseAnonKey || '');
+  const COMMUNITY_KEY='flpr_public_community_slug_v1';
 
   function enabled(){ return /^https:\/\/.+\.supabase\.co$/i.test(base) && key.length > 40; }
   function headers(){ return { apikey:key, Authorization:`Bearer ${key}`, Accept:'application/json' }; }
@@ -24,8 +25,13 @@ window.FLPR_LIVE = (() => {
     const d=new Date(value); if(Number.isNaN(d.getTime())) return String(value);
     return d.toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
   }
+  async function loadCommunities(){
+    return rest('v_flpr_public_communities?select=id,community_code,slug,display_name,is_default,status,active_players,published_tournaments&order=is_default.desc,display_name.asc');
+  }
+  function preferredCommunitySlug(){try{return localStorage.getItem(COMMUNITY_KEY)||'';}catch{return '';}}
+  function setCommunitySlug(slug){try{localStorage.setItem(COMMUNITY_KEY,String(slug||''));}catch{}}
   function mergePlayer(row, snapshot){
-    const s=row.player_statistics || row.statistics || {};
+    const s=row.player_statistics || row.statistics || row || {};
     const name=row.display_name || snapshot?.name || 'Unknown Player';
     const matches=num(s.matches_played, snapshot?.matches||0);
     const wins=num(s.wins, snapshot?.wins||0);
@@ -38,14 +44,15 @@ window.FLPR_LIVE = (() => {
     const pd=num(s.total_points_for)-num(s.total_points_against);
     return {
       ...(snapshot||{}),
-      id:row.id,
+      id:row.id || row.player_id,
       name,
-      slug:row.slug || String(name).toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''),
+      photo:row.photo_url || snapshot?.photo || '',
+      slug:row.slug || row.player_slug || String(name).toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''),
       rank,
       matches,wins,losses,draws,
       winRate:Number(winRate.toFixed(1)),
       rating,
-      handicap:num(row.handicap, snapshot?.handicap||0),
+      handicap:num(row.current_handicap ?? row.handicap, snapshot?.handicap||0),
       tournaments:num(row.tournaments_played ?? s.tournaments_played,0),
       provisional:!Boolean(s.ranking_eligible),
       status:String(s.player_status || (row.provisional?'PROVISIONAL':'ESTABLISHED')).toUpperCase(),
@@ -75,56 +82,59 @@ window.FLPR_LIVE = (() => {
       liveCore:true
     };
   }
-  async function loadPlayers(snapshotPlayers=[]){
-    const select='id,display_name,slug,rating,handicap,tournaments_played,provisional,status,player_statistics(rank,previous_rank,tournaments_played,matches_played,wins,draws,losses,win_rate,total_points_for,total_points_against,average_points,momentum,consistency,dominance,clutch_score,versatility,schedule_strength,adjusted_win_rate,reliability,championships,podiums,official_rating,confidence_score,player_status,ranking_eligible)';
-    const rows=await rest(`players?select=${encodeURIComponent(select)}&status=eq.active&order=rating.desc`);
+  async function loadPlayers(snapshotPlayers=[],community){
+    const select='community_id,player_id,display_name,canonical_display_name,player_slug,photo_url,membership_status,rank,previous_rank,tournaments_played,matches_played,wins,draws,losses,win_rate,total_points_for,total_points_against,average_points,momentum,consistency,dominance,clutch_score,versatility,schedule_strength,adjusted_win_rate,reliability,championships,podiums,official_rating,confidence_score,player_status,ranking_eligible,current_handicap,handicap_provisional';
+    const rows=await rest(`v_flpr_public_community_players?select=${encodeURIComponent(select)}&community_id=eq.${community.id}&order=rank.asc`);
     const bySlug=new Map(snapshotPlayers.map(p=>[p.slug,p]));
-    return rows.map(r=>mergePlayer(r,bySlug.get(r.slug)));
+    return rows.map(r=>mergePlayer(r,community.is_default?bySlug.get(r.player_slug):null));
   }
-  async function loadChampionshipRanking(){
-    const cols='championship_rank,player_id,display_name,championship_eligibility,rolling_appearances,championships,podiums,best_finish,raw_rolling_points,confidence_factor,inactivity_factor,championship_score,flpr_rating_tiebreak,latest_event_date';
+  async function loadChampionshipRanking(community){
+    const cols='community_id,community_slug,championship_rank,player_id,display_name,championship_eligibility,rolling_appearances,championships,podiums,best_finish,raw_rolling_points,confidence_factor,inactivity_factor,championship_score,flpr_rating_tiebreak,latest_event_date';
     try{
-      return await rest(`v_flpr_championship_ranking_v1?select=${encodeURIComponent(cols)}&order=championship_rank.asc`);
+      return await rest(`v_flpr_championship_ranking_v2?select=${encodeURIComponent(cols)}&community_id=eq.${community.id}&order=championship_rank.asc`);
     }catch(error){
       console.warn('Championship Ranking shadow view unavailable; official FLPR ranking remains active.',error);
       return [];
     }
   }
-  async function loadChampionshipBreakdown(){
-    const cols='championship_rank,player_id,display_name,championship_eligibility,rolling_appearances,appearances_to_eligible,raw_rolling_points,confidence_factor,inactivity_factor,championship_score,tournament_id,tournament_name,event_date,recency_number,field_size,final_position,finish_band,participation_points,finish_bonus,field_size_multiplier,raw_event_points,weighted_event_contribution';
+  async function loadChampionshipBreakdown(community){
+    const cols='community_id,community_slug,championship_rank,player_id,display_name,championship_eligibility,rolling_appearances,appearances_to_eligible,raw_rolling_points,confidence_factor,inactivity_factor,championship_score,tournament_id,tournament_name,event_date,recency_number,field_size,final_position,finish_band,participation_points,finish_bonus,field_size_multiplier,raw_event_points,weighted_event_contribution';
     try{
-      return await rest(`v_flpr_championship_event_breakdown_v1?select=${encodeURIComponent(cols)}&order=event_date.desc`);
+      return await rest(`v_flpr_championship_event_breakdown_v2?select=${encodeURIComponent(cols)}&community_id=eq.${community.id}&order=event_date.desc`);
     }catch(error){
       console.warn('Championship explainability view unavailable; player scorecards remain active.',error);
       return [];
     }
   }
-  async function loadChampionshipHistory(){
+  async function loadChampionshipHistory(community){
     const cols='community_id,tournament_id,player_id,snapshot_key,championship_rank,previous_rank,rank_movement,championship_score,previous_score,score_change,championship_eligibility,rolling_appearances,snapshot_source,captured_at';
     try{
-      return await rest(`flpr_championship_ranking_history?select=${encodeURIComponent(cols)}&calculation_version=eq.championship-v1&order=captured_at.desc`);
+      return await rest(`flpr_championship_ranking_history?select=${encodeURIComponent(cols)}&community_id=eq.${community.id}&calculation_version=eq.championship-v1&order=captured_at.desc`);
     }catch(error){
       console.warn('Championship history unavailable; current Championship Ranking remains active.',error);
       return [];
     }
   }
-  async function loadTournaments(){
-    const cols='id,source_tournament_id,name,status,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url,cover_photo_url';
-    const tournaments=await rest(`tournaments?select=${encodeURIComponent(cols)}&status=eq.published&order=published_at.asc`);
+  async function loadTournaments(community){
+    const cols='id,source_tournament_id,name,status,format,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url,cover_photo_url';
+    const tournaments=await rest(`v_flpr_public_community_tournaments?select=${encodeURIComponent(cols)}&community_id=eq.${community.id}&order=published_at.asc`);
+    if(!tournaments.length)return [];
+    const tournamentIds=tournaments.map(t=>t.id).join(',');
     let entries=[],matches=[],matchPlayers=[];
     try{
       // Load every tournament standing, not only the top three. The complete
       // set is required to calculate tournament total and average points.
       const tpcols='id,tournament_id,player_id,source_player_name,final_position,total_points,players(display_name)';
-      entries=await rest(`tournament_players?select=${encodeURIComponent(tpcols)}&order=final_position.asc`);
+      entries=await rest(`tournament_players?select=${encodeURIComponent(tpcols)}&tournament_id=in.(${tournamentIds})&order=final_position.asc`);
     }catch(error){ console.warn('Tournament standings query unavailable',error); }
     try{
       const matchCols='id,tournament_id,round_number,court_label,match_number,team_a_score,team_b_score,status';
       const playerCols='match_id,tournament_player_id,team_no,team_slot,result';
-      [matches,matchPlayers]=await Promise.all([
-        rest(`matches?select=${encodeURIComponent(matchCols)}&order=round_number.asc,match_number.asc`),
-        rest(`match_players?select=${encodeURIComponent(playerCols)}&order=team_no.asc,team_slot.asc`)
-      ]);
+      matches=await rest(`matches?select=${encodeURIComponent(matchCols)}&tournament_id=in.(${tournamentIds})&order=round_number.asc,match_number.asc`);
+      if(matches.length){
+        const matchIds=matches.map(x=>x.id).join(',');
+        matchPlayers=await rest(`match_players?select=${encodeURIComponent(playerCols)}&match_id=in.(${matchIds})&order=team_no.asc,team_slot.asc`);
+      }
     }catch(error){ console.warn('Match Explorer data unavailable; tournament summaries remain active.',error); }
     const tournamentPlayerById=new Map(entries.map(row=>[row.id,row]));
     return tournaments.map((t,index)=>{
@@ -170,7 +180,7 @@ window.FLPR_LIVE = (() => {
         name:t.name || `JakSel T${index+1}`,
         date:fmtDate(t.tournament_date||t.published_at||t.imported_at),
         dateISO:String(t.tournament_date||t.published_at||t.imported_at||'').slice(0,10),
-        location:'Jakarta Selatan',format:'Americano',
+        location:community.display_name,format:t.format||'Americano',
         players:playerCount,rounds:num(t.round_count),matches:num(t.match_count),
         totalPoints,
         averagePoints:playerCount ? totalPoints/playerCount : null,
@@ -183,7 +193,8 @@ window.FLPR_LIVE = (() => {
       };
     });
   }
-  async function loadHistoricalAnalytics(){
+  async function loadHistoricalAnalytics(community){
+    if(!community.is_default)return new Map();
     try{
       const summaryCols='player_id,current_rank,previous_historical_rank,rank_change,trend_status,current_official_rating,previous_official_rating,rating_change,best_rank_ever,worst_rank_ever,average_rank,rank_volatility,number_one_snapshots,top_three_snapshots,top_three_rate,longest_improvement_streak,longest_stability_streak,longest_top3_streak,longest_number_one_streak,snapshot_count,career_rank_improvement,career_rating_change,career_trend_score,career_status,movement_direction,dashboard_tier,first_snapshot_at,latest_snapshot_at';
       const timelineCols='player_id,snapshot_key,snapshot_source,tournament_id,captured_at,rank,previous_historical_rank,rank_change,rank_trend,official_rating,previous_official_rating,rating_change,player_snapshot_number';
@@ -203,18 +214,20 @@ window.FLPR_LIVE = (() => {
       return new Map();
     }
   }
-  async function loadRelationships(){
+  async function loadRelationships(community){
+    if(!community.is_default)return [];
     const cols='player_id,related_player_id,related_player_name,relationship_type,matches_played,wins,draws,losses,win_rate,point_diff_per_match,chemistry_delta';
     try{return await rest(`v_flpr_relationship_live?select=${encodeURIComponent(cols)}`);}
     catch(error){console.warn('Live relationship view unavailable.',error);return [];}
   }
-  async function loadOfficialHistories(){
+  async function loadOfficialHistories(community){
     const result={ratings:[],handicaps:[]};
-    try{result.ratings=await rest('rating_history?select=player_id,tournament_id,rating_before,rating_after,rating_change,created_at&order=created_at.asc');}catch(error){console.warn('Rating history unavailable.',error);}
-    try{result.handicaps=await rest('handicap_history?select=player_id,tournament_id,handicap_before,handicap_after,handicap_change,provisional,created_at&order=created_at.asc');}catch(error){console.warn('Handicap history unavailable.',error);}
+    try{result.ratings=await rest(`v_flpr_public_community_rating_history?select=player_id,tournament_id,rating_before,rating_after,rating_change,created_at&community_id=eq.${community.id}&order=created_at.asc`);}catch(error){console.warn('Rating history unavailable.',error);}
+    try{result.handicaps=await rest(`v_flpr_public_community_handicap_history?select=player_id,tournament_id,handicap_before,handicap_after,handicap_change,provisional,created_at&community_id=eq.${community.id}&order=created_at.asc`);}catch(error){console.warn('Handicap history unavailable.',error);}
     return result;
   }
-  async function loadAdvancedMetrics(){
+  async function loadAdvancedMetrics(community){
+    if(!community.is_default)return [];
     const cols='player_id,clutch_matches,proposed_clutch,average_opponent_rating,proposed_schedule_strength,unique_partners,proposed_versatility,raw_momentum,proposed_momentum_index,raw_dominance,proposed_dominance_index';
     try{return await rest(`v_flpr_advanced_metrics_live?select=${encodeURIComponent(cols)}`);}
     catch(error){console.warn('Live advanced-metric view unavailable.',error);return [];}
@@ -289,7 +302,12 @@ window.FLPR_LIVE = (() => {
     }
   }
   async function hydrate(snapshot){
-    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking,championshipBreakdown,championshipHistory]=await Promise.all([loadPlayers(snapshot.players||[]),loadTournaments(),loadHistoricalAnalytics(),loadRelationships(),loadOfficialHistories(),loadAdvancedMetrics(),loadChampionshipRanking(),loadChampionshipBreakdown(),loadChampionshipHistory()]);
+    const communities=await loadCommunities();
+    if(!communities.length)throw new Error('No active FLPR community is available.');
+    const requested=preferredCommunitySlug();
+    const community=communities.find(c=>c.slug===requested)||communities.find(c=>c.is_default)||communities[0];
+    setCommunitySlug(community.slug);
+    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking,championshipBreakdown,championshipHistory]=await Promise.all([loadPlayers(snapshot.players||[],community),loadTournaments(community),loadHistoricalAnalytics(community),loadRelationships(community),loadOfficialHistories(community),loadAdvancedMetrics(community),loadChampionshipRanking(community),loadChampionshipBreakdown(community),loadChampionshipHistory(community)]);
     const championshipSnapshots=[...new Set(championshipHistory.map(row=>row.snapshot_key).filter(Boolean))];
     const latestChampionshipHistory=new Map();
     for(const row of championshipHistory){if(!latestChampionshipHistory.has(row.player_id))latestChampionshipHistory.set(row.player_id,row);}
@@ -352,15 +370,16 @@ window.FLPR_LIVE = (() => {
     kpis['Average Rating']=players.length?Number((players.reduce((a,p)=>a+p.rating,0)/players.length).toFixed(2)):0;
     return {
       ...snapshot,
-      meta:{...(snapshot.meta||{}),version:'Tournament Intelligence',dataMode:'LIVE SUPABASE + HISTORICAL ANALYTICS',sourceWorkbook:'Supabase live database with approved analytics fallback',liveLoadedAt:new Date().toISOString()},
+      meta:{...(snapshot.meta||{}),version:'Tournament Intelligence',dataMode:'LIVE SUPABASE + COMMUNITY SCOPE',sourceWorkbook:'Supabase community-scoped public read models',liveLoadedAt:new Date().toISOString(),community},
       kpis,players,
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
-      live:{ok:true,players:players.length,tournaments:tournaments.length,relationships:relationships.length,advancedMetrics:advancedMetrics.length,ratingHistory:officialHistories.ratings.length,handicapHistory:officialHistories.handicaps.length,loadedAt:new Date().toISOString()},
+      live:{ok:true,communityId:community.id,communitySlug:community.slug,communityName:community.display_name,players:players.length,tournaments:tournaments.length,relationships:relationships.length,advancedMetrics:advancedMetrics.length,ratingHistory:officialHistories.ratings.length,handicapHistory:officialHistories.handicaps.length,loadedAt:new Date().toISOString()},
+      communities,currentCommunity:community,
       tournaments,
       championshipRanking,
       championshipHistory,
       championshipSnapshotCount:championshipSnapshots.length
     };
   }
-  return { enabled, hydrate };
+  return { enabled, hydrate, loadCommunities, preferredCommunitySlug, setCommunitySlug };
 })();

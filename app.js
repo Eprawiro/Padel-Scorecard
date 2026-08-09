@@ -18,6 +18,7 @@ const ARCHIVE_KEY='flpr_verified_tournaments_v1';
 function loadImportedTournaments(){try{const raw=localStorage.getItem(ARCHIVE_KEY);const parsed=raw?JSON.parse(raw):[];return Array.isArray(parsed)?parsed:[];}catch(e){console.warn('Archive load failed',e);return [];}}
 function tournamentSequence(t){const candidates=[t.id,t.sourceTournamentId,t.name];for(const value of candidates){const m=String(value||'').match(/(?:^|\b)T\s*0*(\d+)(?:\b|$)/i);if(m)return Number(m[1]);}return Number.MAX_SAFE_INTEGER;}
 function tournamentDisplayName(t,index=null){
+  if(DATA?.currentCommunity && !DATA.currentCommunity.is_default)return String(t?.name||'Tournament');
   const values=[t?.name,t?.sourceTournamentId,t?.id,t?.label];
   for(const value of values){
     const match=String(value||'').match(/(?:jak(?:arta)?[\s-]*sel(?:atan)?[\s-]*)?T\s*0*(\d+)\b/i);
@@ -63,6 +64,23 @@ function panelTitle(label,key){return `<div class="panel-title-with-info"><h3>${
 function route(){const raw=location.hash.replace(/^#/,'')||'home';const [name,param]=raw.split('/');return {name:ROUTES.some(r=>r[0]===name)?name:'home',param:decodeURIComponent(param||'')};}
 function navLink(id,label){return `<a href="#${id}" data-route="${id}">${label}</a>`;}
 function buildDrawer(){drawer.innerHTML=`<div class="drawer-head"><strong>FLPR Menu</strong><button class="drawer-close" id="drawerClose" aria-label="Close menu">×</button></div>${ROUTES.map(r=>navLink(...r)).join('')}`;}
+function setupCommunitySwitcher(){
+  const wrapper=document.getElementById('communitySwitcher'),select=document.getElementById('communitySelect');
+  const communities=DATA?.communities||[],current=DATA?.currentCommunity;
+  if(!wrapper||!select||!current||!communities.length){if(wrapper)wrapper.hidden=true;return;}
+  select.innerHTML=communities.map(c=>`<option value="${escapeHtml(c.slug)}">${escapeHtml(c.display_name)}</option>`).join('');
+  select.value=current.slug;
+  select.disabled=communities.length<2;
+  wrapper.hidden=false;
+  wrapper.title=communities.length<2?'Only one community is active.':'Switch community';
+  select.addEventListener('change',()=>{
+    if(select.value===current.slug)return;
+    window.FLPR_LIVE?.setCommunitySlug(select.value);
+    document.body.classList.add('community-changing');
+    location.hash='home';
+    location.reload();
+  });
+}
 function setMenu(open){drawer.classList.toggle('open',open);drawer.setAttribute('aria-hidden',String(!open));menuButton.setAttribute('aria-expanded',String(open));backdrop.hidden=!open;document.body.style.overflow=open?'hidden':'';}
 function title(t,s){return `<h1 class="page-title">${escapeHtml(t)}</h1><p class="subtitle">${escapeHtml(s)}</p>`;}
 function displayValue(value,fallback='—'){if(value===null||value===undefined||value==='')return fallback;if(typeof value==='number'&&!Number.isFinite(value))return fallback;return value;}
@@ -519,7 +537,7 @@ function historicalAnalyticsDashboard(p){
   const badges=intelligenceBadges(p,h,c);
   const coach=careerCoach(p,h,c);
   const latestFinish=h.length?h[h.length-1]:null;
-  const finishHistory=h.length?`<div class="tournament-finish-chart primary-history"><div class="history-chart-heading"><div><span class="eyebrow">Official Tournament Results</span><h4>${parameterLabel('Tournament Finish History','tournament-finish-history-chart')}</h4></div><div class="latest-finish"><small>Latest finish</small><strong>${escapeHtml(latestFinish.label)} · #${latestFinish.rank}</strong><span>${placementIcon(latestFinish.rank)} ${latestFinish.points} points</span></div></div>${profileChart(h.map(x=>-Number(x.rank)),h.map(x=>x.label),'Verified tournament finishing positions',v=>`#${Math.abs(v).toFixed(0)}`)}<p class="chart-note">This chart shows tournament finishing positions. Edy’s #3 at JakSel T6 is a bronze tournament finish.</p></div>`:'';
+  const finishHistory=h.length?`<div class="tournament-finish-chart primary-history"><div class="history-chart-heading"><div><span class="eyebrow">Official Tournament Results</span><h4>${parameterLabel('Tournament Finish History','tournament-finish-history-chart')}</h4></div><div class="latest-finish"><small>Latest finish</small><strong>${escapeHtml(latestFinish.label)} · #${latestFinish.rank}</strong><span>${placementIcon(latestFinish.rank)} ${latestFinish.points} points</span></div></div>${profileChart(h.map(x=>-Number(x.rank)),h.map(x=>x.label),'Verified tournament finishing positions',v=>`#${Math.abs(v).toFixed(0)}`)}<p class="chart-note">This chart shows verified tournament finishing positions inside the selected community.</p></div>`:'';
   const rankingHistory=t.length?`<div class="analytics-charts official-history-charts"><div><h4>${parameterLabel('Official Ranking Snapshots','ranking-history-chart')}</h4>${profileChart(t.map(x=>-Number(x.rank)),labels,'Official ranking history',v=>`#${Math.abs(v).toFixed(0)}`)}<p class="chart-note"><strong>Official Ranking only:</strong> this is not the finishing position in a tournament.</p></div><div><h4>${parameterLabel('Official Rating History','rating-history-chart')}</h4>${profileChart(t.map(x=>Number(x.official_rating||0)),labels,'Official rating history')}</div></div>`:`<div class="data-status pending"><span>◷</span><div><b>Official ranking snapshots are ready</b><p>The next committed tournament will add another official snapshot automatically.</p></div></div>`;
   const history=`${finishHistory}${rankingHistory}`;
   const journey=h.length?`<div class="journey-track">${h.map((x,i)=>{const prev=i?h[i-1]:null;const move=prev?Number(prev.rank)-Number(x.rank):0;return `<div class="journey-stop"><span class="journey-dot">${placementIcon(x.rank)}</span><small>${escapeHtml(x.label)}</small><strong>#${x.rank}</strong><em class="${move>0?'up':move<0?'down':''}">${i===0?'Start':move>0?`▲ ${move}`:move<0?`▼ ${Math.abs(move)}`:'—'}</em></div>`}).join('')}</div>`:`<div class="data-status pending"><span>◷</span><div><b>Tournament Journey pending</b><p>Import verified tournament standings to activate the career journey.</p></div></div>`;
@@ -962,5 +980,5 @@ function wirePage(name){
     document.getElementById('exportArchive')?.addEventListener('click',()=>{const blob=new Blob([JSON.stringify(loadImportedTournaments(),null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='flpr-verified-tournament-archive.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
   }
 }
-async function init(){buildDrawer();menuButton.addEventListener('click',()=>setMenu(!drawer.classList.contains('open')));backdrop.addEventListener('click',()=>setMenu(false));drawer.addEventListener('click',e=>{if(e.target.closest('#drawerClose')||e.target.closest('a'))setMenu(false);});document.addEventListener('click',e=>{const info=e.target.closest('[data-info]');if(info){e.preventDefault();openInfo(info.dataset.info);return;}if(e.target.closest('[data-close-info]'))closeInfo();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeInfo();});window.addEventListener('hashchange',render);try{const res=await fetch('flpr-data.json',{cache:'no-store'});if(!res.ok)throw new Error(`Data load failed (${res.status})`);const snapshot=await res.json();DATA=snapshot;if(window.FLPR_LIVE?.enabled()){try{DATA=await window.FLPR_LIVE.hydrate(snapshot);TOURNAMENTS=DATA.tournaments||TOURNAMENTS;console.info('FLPR live Supabase integration active',DATA.live);}catch(liveError){console.error('Live Supabase load failed; snapshot fallback active.',liveError);DATA={...snapshot,meta:{...(snapshot.meta||{}),dataMode:'SNAPSHOT FALLBACK — SUPABASE LOAD FAILED'},live:{ok:false,error:liveError.message}};}}render();}catch(err){console.error(err);app.innerHTML=`<div class="error"><h2>FLPR data could not be loaded</h2><p>${escapeHtml(err.message)}</p></div>`;}}
+async function init(){buildDrawer();menuButton.addEventListener('click',()=>setMenu(!drawer.classList.contains('open')));backdrop.addEventListener('click',()=>setMenu(false));drawer.addEventListener('click',e=>{if(e.target.closest('#drawerClose')||e.target.closest('a'))setMenu(false);});document.addEventListener('click',e=>{const info=e.target.closest('[data-info]');if(info){e.preventDefault();openInfo(info.dataset.info);return;}if(e.target.closest('[data-close-info]'))closeInfo();});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeInfo();});window.addEventListener('hashchange',render);try{const res=await fetch('flpr-data.json',{cache:'no-store'});if(!res.ok)throw new Error(`Data load failed (${res.status})`);const snapshot=await res.json();DATA=snapshot;if(window.FLPR_LIVE?.enabled()){try{DATA=await window.FLPR_LIVE.hydrate(snapshot);TOURNAMENTS=DATA.tournaments||TOURNAMENTS;console.info('FLPR live Supabase integration active',DATA.live);}catch(liveError){console.error('Live Supabase load failed; snapshot fallback active.',liveError);DATA={...snapshot,meta:{...(snapshot.meta||{}),dataMode:'SNAPSHOT FALLBACK — SUPABASE LOAD FAILED'},live:{ok:false,error:liveError.message}};}}setupCommunitySwitcher();render();}catch(err){console.error(err);app.innerHTML=`<div class="error"><h2>FLPR data could not be loaded</h2><p>${escapeHtml(err.message)}</p></div>`;}}
 init();
