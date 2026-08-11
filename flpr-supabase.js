@@ -242,7 +242,10 @@ window.FLPR_LIVE = (() => {
       player.averageOpponentRating=Number(num(row.average_opponent_rating).toFixed(2));
       player.versatility=Number((num(row.proposed_versatility)*100).toFixed(1));
       player.uniquePartners=num(row.unique_partners);
-      player.recentForm=Number(num(row.proposed_momentum_index).toFixed(1));
+      // Keep the public 0–100 Momentum value from the canonical community
+      // player view. The advanced model can be signed, so expose it separately
+      // instead of overwriting the public score after progressive hydration.
+      player.advancedMomentumIndex=Number(num(row.proposed_momentum_index).toFixed(1));
       player.rawMomentum=num(row.raw_momentum);
       player.dominance=Number(num(row.proposed_dominance_index).toFixed(1));
       player.rawDominance=num(row.raw_dominance);
