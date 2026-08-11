@@ -247,9 +247,10 @@ window.FLPR_LIVE = (() => {
       player.versatility=Number((num(row.proposed_versatility)*100).toFixed(1));
       player.uniquePartners=num(row.unique_partners);
       // Keep the public 0–100 Momentum value from the canonical community
-      // player view. The advanced model can be signed, so expose it separately
-      // instead of overwriting the public score after progressive hydration.
+      // model separate from its signed raw signal. proposed_momentum_index is
+      // the verified normalized public value; raw_momentum remains internal.
       player.advancedMomentumIndex=Number(num(row.proposed_momentum_index).toFixed(1));
+      player.recentForm=player.advancedMomentumIndex;
       player.rawMomentum=num(row.raw_momentum);
       player.dominance=Number(num(row.proposed_dominance_index).toFixed(1));
       player.rawDominance=num(row.raw_dominance);
