@@ -48,7 +48,14 @@ const backdrop = document.getElementById('backdrop');
 
 function escapeHtml(value=''){return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 function slugify(v=''){return String(v).toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
-function avatar(name){return PHOTO[slugify(name)] || 'generic-padel-avatar.svg';}
+function avatar(name){
+  const slug=slugify(name);
+  const livePlayer=DATA?.players?.find(player=>
+    player?.slug===slug || slugify(player?.name)===slug
+  );
+  const livePhoto=safeMediaUrl(livePlayer?.photo);
+  return livePhoto || PHOTO[slug] || 'generic-padel-avatar.svg';
+}
 function avatarImg(name,cls='',alt=''){return `<img${cls?` class="${escapeHtml(cls)}"`:''} src="${avatar(name)}" alt="${escapeHtml(alt||name)}" loading="lazy" onerror="this.onerror=null;this.src='generic-padel-avatar.svg'">`;}
 function safeMediaUrl(value=''){
   const raw=String(value||'').trim();
