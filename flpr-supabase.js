@@ -42,6 +42,10 @@ window.FLPR_LIVE = (() => {
     const rank=num(s.rank, snapshot?.rank||999);
     const previousRank=num(s.previous_rank,rank);
     const pd=num(s.total_points_for)-num(s.total_points_against);
+    const liveMomentum=num(s.momentum,NaN);
+    const publicMomentum=Number.isFinite(liveMomentum)&&liveMomentum>=0&&liveMomentum<=100
+      ? liveMomentum
+      : num(snapshot?.recentForm,0);
     return {
       ...(snapshot||{}),
       id:row.id || row.player_id,
@@ -62,7 +66,7 @@ window.FLPR_LIVE = (() => {
       officialRating:rating,
       consistency:Number((num(s.consistency, (snapshot?.consistency||0)/100)*100).toFixed(1)),
       dominance:Number((s.dominance==null ? snapshot?.dominance||0 : num(s.dominance)).toFixed(1)),
-      recentForm:Number((num(s.momentum, snapshot?.recentForm||0)).toFixed(1)),
+      recentForm:Number(publicMomentum.toFixed(1)),
       // Expectation is a workbook/snapshot metric and may not exist yet for a
       // newly imported player. Preserve that absence so the scorecard can show
       // an evidence-pending value instead of crashing or inventing a zero.
