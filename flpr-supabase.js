@@ -119,7 +119,7 @@ window.FLPR_LIVE = (() => {
       return [];
     }
   }
-  async function loadTournaments(community){
+  async function loadTournaments(community,includeMatches=true){
     const cols='id,source_tournament_id,name,status,format,player_count,round_count,match_count,tournament_date,published_at,imported_at,source_url,cover_photo_url';
     const tournaments=await rest(`v_flpr_public_community_tournaments?select=${encodeURIComponent(cols)}&community_id=eq.${community.id}&order=published_at.asc`);
     if(!tournaments.length)return [];
@@ -131,7 +131,7 @@ window.FLPR_LIVE = (() => {
       const tpcols='id,tournament_id,player_id,source_player_name,final_position,total_points,players(display_name)';
       entries=await rest(`tournament_players?select=${encodeURIComponent(tpcols)}&tournament_id=in.(${tournamentIds})&order=final_position.asc`);
     }catch(error){ console.warn('Tournament standings query unavailable',error); }
-    try{
+    if(includeMatches)try{
       const matchCols='id,tournament_id,round_number,court_label,match_number,team_a_score,team_b_score,status';
       const playerCols='match_id,tournament_player_id,team_no,team_slot,result';
       matches=await rest(`matches?select=${encodeURIComponent(matchCols)}&tournament_id=in.(${tournamentIds})&order=round_number.asc,match_number.asc`);
@@ -302,13 +302,36 @@ window.FLPR_LIVE = (() => {
       player.liveRelationships=all.length;
     }
   }
-  async function hydrate(snapshot){
+  async function hydrate(snapshot,onCore){
     const communities=await loadCommunities();
     if(!communities.length)throw new Error('No active FLPR community is available.');
     const requested=preferredCommunitySlug();
     const community=communities.find(c=>c.slug===requested)||communities.find(c=>c.is_default)||communities[0];
     setCommunitySlug(community.slug);
-    const [players,tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking,championshipBreakdown,championshipHistory]=await Promise.all([loadPlayers(snapshot.players||[],community),loadTournaments(community),loadHistoricalAnalytics(community),loadRelationships(community),loadOfficialHistories(community),loadAdvancedMetrics(community),loadChampionshipRanking(community),loadChampionshipBreakdown(community),loadChampionshipHistory(community)]);
+    // Render the landing page from the minimum live dataset first. Match
+    // Explorer, histories, relationships, and championship analytics continue
+    // only after the current podium and players are available to the UI.
+    const [players,coreTournaments]=await Promise.all([
+      loadPlayers(snapshot.players||[],community),
+      loadTournaments(community,false)
+    ]);
+    const coreKpis={...(snapshot.kpis||{})};
+    coreKpis.Players=players.length;
+    coreKpis['Valid Matches']=Math.round(players.reduce((a,p)=>a+p.matches,0)/4);
+    coreKpis['Total Wins']=players.reduce((a,p)=>a+p.wins,0);
+    coreKpis['Average Matches / Player']=players.length?Number((players.reduce((a,p)=>a+p.matches,0)/players.length).toFixed(1)):0;
+    coreKpis['Average Win Rate']=players.length?Number((players.reduce((a,p)=>a+p.winRate,0)/players.length).toFixed(1)):0;
+    coreKpis['Average Rating']=players.length?Number((players.reduce((a,p)=>a+p.rating,0)/players.length).toFixed(2)):0;
+    if(typeof onCore==='function')onCore({
+      ...snapshot,
+      meta:{...(snapshot.meta||{}),version:'Tournament Intelligence',dataMode:'LIVE SUPABASE CORE · ADVANCED DATA LOADING',sourceWorkbook:'Supabase community-scoped public read models',liveLoadedAt:new Date().toISOString(),community},
+      kpis:coreKpis,players,
+      integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
+      live:{ok:true,progressive:true,communityId:community.id,communitySlug:community.slug,communityName:community.display_name,players:players.length,tournaments:coreTournaments.length,loadedAt:new Date().toISOString()},
+      communities,currentCommunity:community,tournaments:coreTournaments,
+      championshipRanking:[],championshipHistory:[],championshipSnapshotCount:0
+    });
+    const [tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking,championshipBreakdown,championshipHistory]=await Promise.all([loadTournaments(community,true),loadHistoricalAnalytics(community),loadRelationships(community),loadOfficialHistories(community),loadAdvancedMetrics(community),loadChampionshipRanking(community),loadChampionshipBreakdown(community),loadChampionshipHistory(community)]);
     const championshipSnapshots=[...new Set(championshipHistory.map(row=>row.snapshot_key).filter(Boolean))];
     const latestChampionshipHistory=new Map();
     for(const row of championshipHistory){if(!latestChampionshipHistory.has(row.player_id))latestChampionshipHistory.set(row.player_id,row);}
