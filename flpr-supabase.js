@@ -63,6 +63,10 @@ window.FLPR_LIVE = (() => {
       consistency:Number((num(s.consistency, (snapshot?.consistency||0)/100)*100).toFixed(1)),
       dominance:Number((s.dominance==null ? snapshot?.dominance||0 : num(s.dominance)).toFixed(1)),
       recentForm:Number((num(s.momentum, snapshot?.recentForm||0)).toFixed(1)),
+      // Expectation is a workbook/snapshot metric and may not exist yet for a
+      // newly imported player. Preserve that absence so the scorecard can show
+      // an evidence-pending value instead of crashing or inventing a zero.
+      expectation:snapshot?.expectation!=null&&Number.isFinite(Number(snapshot.expectation))?Number(snapshot.expectation):null,
       adjustedWinRate:Number(pctFromDb(s.adjusted_win_rate ?? snapshot?.adjustedWinRate).toFixed(1)),
       clutch:Number(pctFromDb(s.clutch_score ?? snapshot?.clutch).toFixed(1)),
       versatility:Number(pctFromDb(s.versatility ?? snapshot?.versatility).toFixed(1)),
