@@ -353,7 +353,14 @@ window.FLPR_LIVE = (() => {
         player.analyticsTimeline=analytics.timeline;
         if(analytics.summary){
           player.tier=analytics.summary.dashboard_tier||player.tier;
-          player.ratingChange={...(player.ratingChange||{}),delta:num(analytics.summary.rating_change),previousRank:num(analytics.summary.previous_historical_rank,player.rank),currentRank:player.rank,rankMovement:num(analytics.summary.rank_change),event:'Historical Analytics Engine'};
+          const livePreviousRank=num(player.ratingChange?.previousRank,player.rank);
+          const historicalCurrentRank=num(analytics.summary.current_rank,player.rank);
+          const previousRank=livePreviousRank!==player.rank
+            ? livePreviousRank
+            : historicalCurrentRank!==player.rank
+              ? historicalCurrentRank
+              : num(analytics.summary.previous_historical_rank,player.rank);
+          player.ratingChange={...(player.ratingChange||{}),delta:num(analytics.summary.rating_change),previousRank,currentRank:player.rank,rankMovement:previousRank-player.rank,event:'Live rank + Historical Analytics Engine'};
         }
       }
       // Tournament Top-3 rate must use verified final standings, not ranking snapshots
