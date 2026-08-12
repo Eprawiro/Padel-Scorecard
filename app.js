@@ -876,7 +876,7 @@ function communityTable(rows,readinessById=new Map()){
     const scope=c.is_default?'<strong>Default · Flagship</strong>':'Independent scoring';
     const action=c.is_default
       ?'<span class="muted">Protected</span>'
-      :`<button class="button secondary small" type="button" data-community-status="${escapeHtml(c.id)}" data-next-status="${c.status==='active'?'inactive':'active'}" data-community-name="${escapeHtml(c.display_name)}" ${c.status!=='active'&&!ready?'disabled title="Complete all activation-readiness checks first."':''}>${c.status==='active'?'Deactivate':'Activate'}</button>`;
+      :`<button class="button secondary small${c.status!=='active'&&!ready?' readiness-locked':''}" type="button" data-community-status="${escapeHtml(c.id)}" data-next-status="${c.status==='active'?'inactive':'active'}" data-community-name="${escapeHtml(c.display_name)}" ${c.status!=='active'&&!ready?'disabled aria-disabled="true" title="Complete all activation-readiness checks first."':''}>${c.status==='active'?'Deactivate':ready?'Activate':'Locked'}</button>`;
     return `<tr><td><strong>${escapeHtml(c.display_name)}</strong><small class="match-note">/${escapeHtml(c.slug)}</small></td><td>${escapeHtml(c.community_code)}</td><td><span class="badge ${c.status==='active'?'admin-active':'admin-inactive'}">${escapeHtml(c.status)}</span></td><td>${readinessCell}</td><td>${scope}</td>${superuser?`<td>${action}</td>`:''}</tr>`;
   }).join('');
   return `<div class="table-wrap"><table class="table admin-table"><thead><tr><th>Community</th><th>Code</th><th>Status</th><th>Activation Readiness</th><th>Scope</th>${superuser?'<th>Actions</th>':''}</tr></thead><tbody>${body}</tbody></table></div>`;
