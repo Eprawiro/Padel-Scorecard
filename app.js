@@ -805,11 +805,14 @@ function hallOfFame(){
 }
 
 function parseStandings(text){return text.split(/\n+/).map(x=>x.trim()).filter(Boolean).map((line,i)=>{const m=line.match(/^\s*(?:(\d+)[.)-]?\s*)?(.+?)\s+(-?\d+(?:\.\d+)?)\s*(?:pts?|points?)?\s*$/i);if(!m)return null;return {rank:Number(m[1]||i+1),name:m[2].trim(),points:Number(m[3])};}).filter(Boolean).sort((a,b)=>a.rank-b.rank);}
-function importedSourceIds(){return loadImportedTournaments().map(t=>String(t.sourceId||'').toLowerCase()).filter(Boolean);}let FLPR_PENDING_PREVIEW=null;
+function importedSourceIds(){return loadImportedTournaments().map(t=>String(t.sourceId||'').toLowerCase()).filter(Boolean);}let FLPR_PENDING_PREVIEW=null;let FLPR_IMPORT_COMMUNITIES=[];
 async function playerAliases(){try{return await window.FLPR_ADMIN?.aliasMap?.()||{'niko':'Nico','nico':'Nico'};}catch(error){console.warn('Alias database unavailable; using safe built-in aliases.',error);return {'niko':'Nico','nico':'Nico'};}}
 function previewStatusBadge(status){const cls=status==='PASS'?'strong':status==='REVIEW'?'steady':'developing';return badge(status,cls);}
-function renderAutoPreview(preview){
+function selectedImportCommunity(){const id=document.getElementById('importCommunityTarget')?.value;return FLPR_IMPORT_COMMUNITIES.find(c=>c.id===id)||null;}
+function importMode(community){if(community?.is_default&&community?.status==='active')return 'publish';if(community&&!community.is_default&&community.status==='inactive')return 'stage';return 'blocked';}
+function renderAutoPreview(preview,community=selectedImportCommunity()){
   const duplicate=Boolean(preview.duplicate)||importedSourceIds().includes(String(preview.sourceId||'').toLowerCase());
+  const mode=importMode(community),staging=mode==='stage';
   const summary=preview.summary||{};
   const standings=preview.standings||[];
   const warnings=(preview.validation?.warnings||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join('');
@@ -828,18 +831,20 @@ function renderAutoPreview(preview){
     <div class="table-wrap"><table class="table"><thead><tr><th>Rank</th><th>Player</th><th>W-L-T</th><th>Diff</th><th>Points</th><th>FLPR match</th></tr></thead><tbody>${playerRows}</tbody></table></div>
     <div class="panel-head"><h3>Round parsing preview</h3>${badge(`${summary.completedMatches||0} complete`)}</div>
     ${matchRows?`<div class="table-wrap"><table class="table"><thead><tr><th>Round</th><th>Court</th><th>Team A</th><th>Score</th><th>Team B</th><th>Status</th></tr></thead><tbody>${matchRows}</tbody></table></div>`:'<div class="notice">No match rows were parsed. Standings are available, but the page structure requires review before Confirm & Publish is enabled.</div>'}
-    <div class="phase-gate"><strong>Confirm & Publish</strong><p>Review all player identities and match rows. Publishing writes the tournament to Supabase and recalculates ranking, rating, handicap, statistics, provisional status, and audit history.</p>
-    ${!duplicate&&preview.validation?.status!=='FAIL'&&Number(summary.matches||0)>0?'<button class="button" id="confirmPublishTournament">Confirm & Publish Tournament</button>':'<button class="button" disabled>Confirm unavailable</button>'}
+    <div class="phase-gate ${staging?'staging-mode':''}"><strong>${staging?'Confirm Private Staging':mode==='publish'?'Confirm & Publish':'Target unavailable'}</strong><p>${staging?`Review every identity and match row. Staging writes verified raw tournament data privately to ${escapeHtml(community?.display_name||'the inactive community')}; it does not calculate rankings, create snapshots, publish publicly, or activate the community.`:mode==='publish'?'Review all player identities and match rows. Publishing writes the tournament to Supabase and recalculates ranking, rating, handicap, statistics, provisional status, and audit history.':'Choose Jaksel for production publishing or an inactive non-default community for private staging.'}</p>
+    ${!duplicate&&mode!=='blocked'&&preview.validation?.status!=='FAIL'&&Number(summary.matches||0)>0?`<button class="button" id="confirmTournamentAction">${staging?'Confirm & Stage Privately':'Confirm & Publish Tournament'}</button>`:'<button class="button" disabled>Confirm unavailable</button>'}
     <div id="confirmPublishStatus"></div></div>
   </section>`;
 }
 function importPage(){const count=loadImportedTournaments().length;return `${title('Tournament Import Preview','Paste one official Americano result link. FLPR will fetch, parse, validate, detect existing/new players, and check duplicates without changing any live data.')}<section class="panel import-box phase21">
-  <div class="phase-banner"><div><small>TOURNAMENT DATA</small><strong>Import · Confirm · Recalculate</strong></div>${badge('Transactional publish')}</div>
-  <div class="notice"><strong>Production confirmation flow:</strong> preview remains read-only. Only the separate Confirm & Publish action writes the verified tournament and recalculates the central FLPR database in one transaction.</div>
+  <div class="phase-banner"><div><small>TOURNAMENT DATA</small><strong>Preview · Publish or Private Stage</strong></div>${badge('Community scoped')}</div>
+  <div class="field import-community-target"><label for="importCommunityTarget">Target community</label><select class="select" id="importCommunityTarget"><option value="">Loading assigned communities…</option></select><small id="importCommunityMode">The destination is checked before any tournament data can be written.</small></div>
+  <div class="notice" id="importScopeNotice"><strong>Safe community workflow:</strong> Jaksel uses its existing atomic production publisher. An inactive non-default community uses verified private staging with no calculations, snapshots, activation, or public visibility.</div>
   <div class="field"><label for="autoSourceUrl">Official Americano result URL</label><div class="url-action"><input class="input" id="autoSourceUrl" inputmode="url" autocomplete="url" placeholder="https://americano-padel.com/r/…"><button class="button" id="fetchAmericanoPreview">Fetch & Preview</button></div></div>
   <div class="import-grid admin-media-fields"><div class="field"><label for="tournamentCoverPhoto">Tournament cover photo <small>(optional)</small></label><input class="input file-input" id="tournamentCoverPhoto" type="file" accept="image/jpeg,image/png,image/webp"></div><div class="field"><label for="tournamentGalleryPhotos">Tournament gallery <small>(optional, multiple)</small></label><input class="input file-input" id="tournamentGalleryPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple></div></div>
   <div class="preview-checklist"><span>✓ Official URL validation</span><span>✓ Server-side fetch</span><span>✓ Standings & rounds</span><span>✓ Existing/new players</span><span>✓ Duplicate fingerprint</span><span>✓ Transactional publish</span></div>
   <div id="autoImportResult"></div>
+  <section class="staging-inventory" id="stagingInventory" hidden><div class="panel-head"><div><small>Inactive community only</small><h3>Private Staging Inventory</h3></div><button class="button secondary small" id="refreshStagingInventory" type="button">Refresh</button></div><div id="stagingInventoryRows" class="admin-loading-box">Choose an inactive community to view staged tournaments.</div></section>
   <details class="legacy-import"><summary>Manual verified-standing fallback</summary><p class="muted">Use this only if the external page cannot be parsed. It remains a local browser archive and does not recalculate FLPR.</p><div class="import-grid"><div class="field"><label for="tournamentId">Tournament ID</label><input class="input" id="tournamentId" placeholder="TEST-T6"></div><div class="field"><label for="tournamentDate">Date</label><input class="input" id="tournamentDate" type="date"></div><div class="field"><label for="tournamentName">Tournament name</label><input class="input" id="tournamentName" placeholder="Dummy Americano"></div><div class="field"><label for="sourceUrl">Official result URL</label><input class="input" id="sourceUrl" placeholder="https://americano-padel.com/r/…"></div></div><div class="field"><label for="rawResult">Verified final standings — one player per line</label><textarea class="textarea" id="rawResult" placeholder="1. Player Name 23&#10;2. Player Name 22&#10;3. Player Name 19"></textarea></div><div class="actions"><button class="button secondary" id="previewImport">Validate Manual Data</button><button class="button secondary" id="saveImport">Save Local Snapshot</button><button class="button secondary" id="exportArchive">Export Archive JSON</button></div><div id="importResult"></div></details>
   <p class="muted">Locally stored legacy snapshots: ${count}</p>
 </section>`;}
@@ -887,6 +892,10 @@ async function loadAdminCommunities(){const box=document.getElementById('adminCo
 function aliasTable(rows){const superuser=window.FLPR_ADMIN?.session()?.admin?.role==='superuser';return rows.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Alias</th><th>Canonical Player</th><th>Status</th>${superuser?'<th>Actions</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${escapeHtml(x.alias_name)}</strong></td><td>${escapeHtml(x.players?.display_name||'Unknown')}</td><td>${x.is_active===false?'Inactive':'Active'}</td>${superuser?`<td><div class="admin-row-actions"><button class="button secondary small" data-alias-active="${escapeHtml(x.id)}" data-active="${x.is_active===false?'true':'false'}">${x.is_active===false?'Activate':'Deactivate'}</button><button class="button danger small" data-alias-delete="${escapeHtml(x.id)}" data-name="${escapeHtml(x.alias_name)}">Delete</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="notice">No database aliases yet. Built-in safety alias Niko → Nico remains active.</div>`;}
 async function loadAdminAliases(){const box=document.getElementById('adminAliasesList'),select=document.getElementById('adminAliasPlayer'),superuser=window.FLPR_ADMIN?.session()?.admin?.role==='superuser';if(box)box.textContent='Loading aliases…';try{const aliasesPromise=window.FLPR_ADMIN.listAliases();const playersPromise=superuser?window.FLPR_ADMIN.listPlayers():Promise.resolve([]);const [aliases,players]=await Promise.all([aliasesPromise,playersPromise]);if(box)box.innerHTML=aliasTable(aliases||[]);if(select)select.innerHTML='<option value="">Choose canonical player</option>'+players.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.display_name)}</option>`).join('');}catch(error){adminMessage(box,error.message,true);}}
 async function loadAdminPlayers(){const select=document.getElementById('adminPlayerSelect');if(!select)return;select.innerHTML='<option value="">Loading players…</option>';try{const players=await window.FLPR_ADMIN.listPlayers();select._players=players;select.innerHTML='<option value="">Choose player</option>'+players.map((p,i)=>`<option value="${i}">${escapeHtml(p.display_name)}${p.photo_url?' · photo exists':''}</option>`).join('');}catch(error){select.innerHTML=`<option value="">${escapeHtml(error.message)}</option>`;}}
+function stagingInventoryTable(rows,community){if(!rows?.length)return '<div class="notice">No privately staged tournaments for this community yet.</div>';return `<div class="table-wrap"><table class="table staging-table"><thead><tr><th>Tournament</th><th>Status</th><th>Players</th><th>Matches</th><th>Staged</th><th>Action</th></tr></thead><tbody>${rows.map(row=>`<tr><td><strong>${escapeHtml(row.tournament_name||row.source_tournament_id)}</strong><small class="match-note">${escapeHtml(row.source_tournament_id)}</small></td><td><span class="badge ${row.staging_status==='verified'?'steady':''}">${escapeHtml(row.staging_status)}</span></td><td>${Number(row.player_count||0)}</td><td>${Number(row.match_count||0)}</td><td>${escapeHtml(new Date(row.created_at).toLocaleString())}</td><td>${row.staging_status==='verified'&&row.tournament_id?`<button class="button danger small" type="button" data-discard-staged="${escapeHtml(row.tournament_id)}" data-community-id="${escapeHtml(community.id)}" data-tournament-name="${escapeHtml(row.tournament_name||row.source_tournament_id)}">Discard</button>`:'<span class="muted">Audit retained</span>'}</td></tr>`).join('')}</tbody></table></div>`;}
+async function loadStagingInventory(){const community=selectedImportCommunity(),section=document.getElementById('stagingInventory'),box=document.getElementById('stagingInventoryRows');if(!section||!box)return;if(importMode(community)!=='stage'){section.hidden=true;return;}section.hidden=false;box.textContent='Loading private staging inventory…';try{box.innerHTML=stagingInventoryTable(await window.FLPR_ADMIN.listCommunityStaging(community.id),community);}catch(error){adminMessage(box,error.message,true);}}
+function refreshImportMode(){const community=selectedImportCommunity(),mode=importMode(community),label=document.getElementById('importCommunityMode'),notice=document.getElementById('importScopeNotice');if(label)label.textContent=mode==='publish'?`${community.display_name}: active default community · atomic production publish`:mode==='stage'?`${community.display_name}: inactive community · verified private staging only`:'Choose an eligible target community.';if(notice)notice.innerHTML=mode==='publish'?`<strong>Production mode:</strong> ${escapeHtml(community.display_name)} uses the existing protected publisher. Confirming recalculates its ranking, rating, handicap, statistics, and both history snapshots atomically.`:mode==='stage'?`<strong>Private staging mode:</strong> ${escapeHtml(community.display_name)} remains inactive and publicly hidden. Confirming stores verified raw tournament data only—no ranking calculation, snapshots, activation, or public publication.`:'<strong>Target required:</strong> choose Jaksel for production publishing or an inactive non-default community for private staging.';if(FLPR_PENDING_PREVIEW){const out=document.getElementById('autoImportResult');if(out)out.innerHTML=renderAutoPreview(FLPR_PENDING_PREVIEW,community);wireConfirmTournamentAction();}loadStagingInventory();}
+async function loadImportCommunities(){const select=document.getElementById('importCommunityTarget');if(!select)return;try{FLPR_IMPORT_COMMUNITIES=await window.FLPR_ADMIN.listCommunities()||[];select.innerHTML='<option value="">Choose target community</option>'+FLPR_IMPORT_COMMUNITIES.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.display_name)} · ${c.is_default?'production':c.status==='inactive'?'private staging':escapeHtml(c.status)}</option>`).join('');const preferred=FLPR_IMPORT_COMMUNITIES.find(c=>c.is_default&&c.status==='active')||FLPR_IMPORT_COMMUNITIES[0];if(preferred)select.value=preferred.id;refreshImportMode();}catch(error){select.innerHTML=`<option value="">${escapeHtml(error.message)}</option>`;refreshImportMode();}}
 function wireAdminPage(){
   const login=document.getElementById('adminLoginForm');
   login?.addEventListener('submit',async event=>{event.preventDefault();const button=document.getElementById('adminLoginButton'),status=document.getElementById('adminLoginStatus');button.disabled=true;button.textContent='Signing in…';try{await window.FLPR_ADMIN.login(document.getElementById('adminUserId').value,document.getElementById('adminPassword').value);location.hash='admin/dashboard';render();}catch(error){adminMessage(status,error.message,true);}finally{button.disabled=false;button.textContent='Sign in securely';}});
@@ -897,6 +906,7 @@ function wireAdminPage(){
   if(section==='activity')loadAdminActivity();
   if(section==='status')loadAdminStatus();
   if(section==='players')loadAdminPlayers();
+  if(section==='import')loadImportCommunities();
   if(section==='aliases')loadAdminAliases();
   document.getElementById('adminRefreshUsers')?.addEventListener('click',loadAdminUsers);
   document.getElementById('adminRefreshCommunities')?.addEventListener('click',loadAdminCommunities);
@@ -904,6 +914,9 @@ function wireAdminPage(){
   document.getElementById('adminRefreshStatus')?.addEventListener('click',loadAdminStatus);
   document.getElementById('adminRefreshPlayers')?.addEventListener('click',loadAdminPlayers);
   document.getElementById('adminRefreshAliases')?.addEventListener('click',loadAdminAliases);
+  document.getElementById('importCommunityTarget')?.addEventListener('change',refreshImportMode);
+  document.getElementById('refreshStagingInventory')?.addEventListener('click',loadStagingInventory);
+  document.getElementById('stagingInventoryRows')?.addEventListener('click',async event=>{const button=event.target.closest('[data-discard-staged]');if(!button)return;if(!window.confirm(`Discard ${button.dataset.tournamentName}? The private tournament rows will be removed, while the staging audit record is retained.`))return;button.disabled=true;try{await window.FLPR_ADMIN.discardStagedTournament(button.dataset.communityId,button.dataset.discardStaged);await loadStagingInventory();}catch(error){window.alert(error.message);button.disabled=false;}});
   document.getElementById('adminCreateCommunity')?.addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,status=document.getElementById('adminCommunityStatus'),button=form.querySelector('button');button.disabled=true;try{const data=new FormData(form);await window.FLPR_ADMIN.createCommunity(data.get('communityCode'),data.get('slug'),data.get('displayName'));form.reset();adminMessage(status,'Inactive community created. Complete its setup and validation before activation.');await loadAdminCommunities();}catch(error){adminMessage(status,error.message,true);}finally{button.disabled=false;}});
   document.getElementById('adminAssignCommunity')?.addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,status=document.getElementById('adminCommunityAccessStatus'),button=form.querySelector('button');button.disabled=true;try{const data=new FormData(form);await window.FLPR_ADMIN.assignCommunityAdmin(data.get('communityId'),data.get('userId'),data.get('communityRole'),true);adminMessage(status,'Community access assigned successfully.');await loadAdminCommunities();}catch(error){adminMessage(status,error.message,true);}finally{button.disabled=false;}});
   document.getElementById('adminCommunitiesList')?.addEventListener('click',async event=>{const button=event.target.closest('[data-community-status]');if(!button)return;const next=button.dataset.nextStatus,name=button.dataset.communityName;if(!window.confirm(`${next==='active'?'Activate':'Deactivate'} ${name}? Activate only after membership, import, ranking, and history validation is complete.`))return;button.disabled=true;try{await window.FLPR_ADMIN.setCommunityStatus(button.dataset.communityStatus,next);await loadAdminCommunities();}catch(error){window.alert(error.message);button.disabled=false;}});
@@ -912,6 +925,32 @@ function wireAdminPage(){
   document.getElementById('adminCreateUser')?.addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,status=document.getElementById('adminUserStatus'),button=form.querySelector('button');button.disabled=true;try{const data=new FormData(form);await window.FLPR_ADMIN.api('create_user',{userName:data.get('userName'),displayName:data.get('displayName'),password:data.get('password')});form.reset();adminMessage(status,'Admin user created successfully.');await loadAdminUsers();}catch(error){adminMessage(status,error.message,true);}finally{button.disabled=false;}});
   document.getElementById('adminUsersList')?.addEventListener('click',async event=>{const activeButton=event.target.closest('[data-admin-active]'),deleteButton=event.target.closest('[data-admin-delete]');if(activeButton){activeButton.disabled=true;try{await window.FLPR_ADMIN.api('set_user_active',{userId:activeButton.dataset.adminActive,active:activeButton.dataset.active==='true'});await loadAdminUsers();}catch(error){window.alert(error.message);activeButton.disabled=false;}}if(deleteButton){if(!window.confirm(`Delete Admin user ${deleteButton.dataset.name}? This cannot be undone.`))return;deleteButton.disabled=true;try{await window.FLPR_ADMIN.api('delete_user',{userId:deleteButton.dataset.adminDelete});await loadAdminUsers();}catch(error){window.alert(error.message);deleteButton.disabled=false;}}});
   document.getElementById('adminUploadPlayerPhoto')?.addEventListener('click',async()=>{const select=document.getElementById('adminPlayerSelect'),file=document.getElementById('adminPlayerPhoto')?.files?.[0],status=document.getElementById('adminPlayerPhotoStatus'),button=document.getElementById('adminUploadPlayerPhoto');const player=select?._players?.[Number(select.value)];if(!player||!file){adminMessage(status,'Choose a player and an image first.',true);return;}button.disabled=true;button.textContent='Uploading…';try{await window.FLPR_ADMIN.uploadPlayerPhoto(player,file);adminMessage(status,`${player.display_name} photo uploaded successfully.`);document.getElementById('adminPlayerPhoto').value='';await loadAdminPlayers();}catch(error){adminMessage(status,error.message,true);}finally{button.disabled=false;button.textContent='Upload / Replace Photo';}});
+}
+function wireConfirmTournamentAction(){
+  document.getElementById('confirmTournamentAction')?.addEventListener('click',async()=>{
+    const button=document.getElementById('confirmTournamentAction'),status=document.getElementById('confirmPublishStatus'),community=selectedImportCommunity(),mode=importMode(community),preview=FLPR_PENDING_PREVIEW;
+    if(!preview||!button||!status||mode==='blocked')return;
+    const staging=mode==='stage';
+    const question=staging?`Stage ${preview.title} privately for ${community.display_name}? No rankings or snapshots will be calculated.`:`Publish ${preview.title} to ${community.display_name}? This will update its production FLPR database.`;
+    if(!window.confirm(question))return;
+    button.disabled=true;button.textContent=staging?'Staging…':'Publishing…';
+    status.innerHTML=staging?'<div class="import-loading"><span class="spinner"></span><div><strong>Staging verified tournament</strong><p>Writing community-scoped players and matches privately. Rankings, snapshots, activation, and public views remain unchanged.</p></div></div>':'<div class="import-loading"><span class="spinner"></span><div><strong>Committing tournament</strong><p>Updating players, matches, ranking, rating, handicap, statistics, and audit history.</p></div></div>';
+    try{
+      let result;
+      if(staging){
+        result=await window.FLPR_ADMIN.stageCommunityTournament(community.id,preview);
+      }else{
+        const session=window.FLPR_ADMIN?.session(),supabaseUrl=String(window.FLPR_CONFIG?.supabaseUrl||'').replace(/\/$/,''),anonKey=String(window.FLPR_CONFIG?.supabaseAnonKey||''),importFunction=String(window.FLPR_CONFIG?.importFunction||'flpr-import-engine').trim(),endpoint=`${supabaseUrl}/functions/v1/${encodeURIComponent(importFunction)}`;
+        const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','apikey':anonKey,'authorization':`Bearer ${session.access_token}`},body:JSON.stringify({action:'confirm',confirmation:'CONFIRM',preview})});
+        const type=response.headers.get('content-type')||'';result=type.includes('application/json')?await response.json():{ok:false,error:`Confirm service returned HTTP ${response.status}.`};
+        if(!response.ok||!result.ok)throw new Error(result.detail?`${result.error||'Publish failed'} · ${result.detail}`:result.error||'Publish failed');
+      }
+      const cover=document.getElementById('tournamentCoverPhoto')?.files?.[0]||null,gallery=[...(document.getElementById('tournamentGalleryPhotos')?.files||[])];let mediaNote='';
+      if(cover||gallery.length){try{if(staging)await window.FLPR_ADMIN.uploadTournamentMedia({id:result.tournamentId,name:preview.title},cover,gallery);else await window.FLPR_ADMIN.uploadTournamentMediaForPreview(preview,cover,gallery);mediaNote=' Tournament photos were uploaded successfully.';}catch(mediaError){mediaNote=` Tournament data is safe, but photo upload needs review: ${escapeHtml(mediaError.message)}`;}}
+      status.innerHTML=staging?`<div class="notice"><strong>✓ Tournament staged privately.</strong> ${escapeHtml(community.display_name)} remains inactive and publicly hidden. No ranking, rating, statistics, or history snapshots were calculated.${mediaNote}</div>`:`<div class="notice"><strong>✓ Tournament published.</strong> The central FLPR ranking, rating, handicap, statistics, provisional status, and audit history were recalculated successfully.${mediaNote}</div>`;
+      button.textContent=staging?'Staged Privately':'Published';FLPR_PENDING_PREVIEW=null;if(staging)await loadStagingInventory();
+    }catch(error){status.innerHTML=`<div class="error"><strong>${staging?'Private staging':'Publish'} failed.</strong> ${escapeHtml(error?.message||'Network request failed.')}</div>`;button.disabled=false;button.textContent=staging?'Confirm & Stage Privately':'Confirm & Publish Tournament';}
+  });
 }
 function wirePage(name){
   if(name==='admin')wireAdminPage();
@@ -932,13 +971,16 @@ function wirePage(name){
     autoButton?.addEventListener('click',async()=>{
       const url=document.getElementById('autoSourceUrl').value.trim();
       const out=document.getElementById('autoImportResult');
+      const target=selectedImportCommunity();
+      if(importMode(target)==='blocked'){out.innerHTML='<div class="error"><strong>Choose a valid target community first.</strong> Use Jaksel for production publishing or an inactive non-default community for private staging.</div>';return;}
       if(!/^https:\/\/(?:www\.)?americano-padel\.com\/r\//i.test(url)){out.innerHTML='<div class="error"><strong>Invalid link.</strong> Paste an official https://americano-padel.com/r/... result URL.</div>';return;}
       autoButton.disabled=true;autoButton.textContent='Fetching…';
       out.innerHTML='<div class="import-loading"><span class="spinner"></span><div><strong>Reading Americano result page</strong><p>Fetching the official page and validating standings, rounds, players, and duplicate identity.</p></div></div>';
       try{
         const adminSession=window.FLPR_ADMIN?.session();
         if(!adminSession?.access_token){out.innerHTML='<div class="error"><strong>Admin login required.</strong> Sign in again before importing a tournament.</div>';return;}
-        const requestBody=JSON.stringify({url,knownPlayers:DATA.players.map(p=>({name:p.name,slug:p.slug})),aliases:await playerAliases()});
+        let knownPlayers;try{knownPlayers=(await window.FLPR_ADMIN.listPlayers()).map(p=>({name:p.display_name,slug:p.slug}));}catch{knownPlayers=DATA.players.map(p=>({name:p.name,slug:p.slug}));}
+        const requestBody=JSON.stringify({url,knownPlayers,aliases:await playerAliases()});
         const supabaseUrl=String(window.FLPR_CONFIG?.supabaseUrl||'').replace(/\/$/,'');
         const anonKey=String(window.FLPR_CONFIG?.supabaseAnonKey||'');
         if(!supabaseUrl||!anonKey){
@@ -958,35 +1000,8 @@ function wirePage(name){
         const body=contentType.includes('application/json')?await res.json():{ok:false,error:`Preview service returned HTTP ${res.status} with a non-JSON response.`};
         if(!res.ok||!body.ok){const detail=body.preview?renderAutoPreview(body.preview):'';out.innerHTML=`<div class="error"><strong>Preview failed.</strong> ${escapeHtml(body.error||`Preview service returned HTTP ${res.status}.`)}</div>${detail}`;return;}
         FLPR_PENDING_PREVIEW=body.preview;
-        out.innerHTML=renderAutoPreview(body.preview);
-        document.getElementById('confirmPublishTournament')?.addEventListener('click',async()=>{
-          const button=document.getElementById('confirmPublishTournament');
-          const status=document.getElementById('confirmPublishStatus');
-          if(!FLPR_PENDING_PREVIEW||!button||!status)return;
-          if(!window.confirm(`Publish ${FLPR_PENDING_PREVIEW.title}? This will update the central FLPR database.`))return;
-          button.disabled=true;button.textContent='Publishing…';
-          status.innerHTML='<div class="import-loading"><span class="spinner"></span><div><strong>Committing tournament</strong><p>Updating players, matches, ranking, rating, handicap, statistics, and audit history.</p></div></div>';
-          try{
-            const publishedPreview=FLPR_PENDING_PREVIEW;
-            const confirmRes=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','apikey':anonKey,'authorization':`Bearer ${adminSession.access_token}`},body:JSON.stringify({action:'confirm',confirmation:'CONFIRM',preview:publishedPreview})});
-            const confirmType=confirmRes.headers.get('content-type')||'';
-            const confirmBody=confirmType.includes('application/json')?await confirmRes.json():{ok:false,error:`Confirm service returned HTTP ${confirmRes.status}.`};
-            if(!confirmRes.ok||!confirmBody.ok){
-              status.innerHTML=`<div class="error"><strong>Publish failed.</strong> ${escapeHtml(confirmBody.error||'Unknown error')}${confirmBody.detail?`<br><small>${escapeHtml(confirmBody.detail)}</small>`:''}</div>`;
-              button.disabled=false;button.textContent='Confirm & Publish Tournament';return;
-            }
-            const cover=document.getElementById('tournamentCoverPhoto')?.files?.[0]||null;
-            const gallery=[...(document.getElementById('tournamentGalleryPhotos')?.files||[])];
-            let mediaNote='';
-            if(cover||gallery.length){try{await window.FLPR_ADMIN.uploadTournamentMediaForPreview(publishedPreview,cover,gallery);mediaNote=' Tournament photos were uploaded successfully.';}catch(mediaError){mediaNote=` Tournament data is safe, but photo upload needs review: ${escapeHtml(mediaError.message)}`;}}
-            status.innerHTML=`<div class="notice"><strong>✓ Tournament published.</strong> The central FLPR ranking, rating, handicap, statistics, provisional status, and audit history were recalculated successfully.${mediaNote}</div>`;
-            button.textContent='Published';
-            FLPR_PENDING_PREVIEW=null;
-          }catch(error){
-            status.innerHTML=`<div class="error"><strong>Publish service unavailable.</strong> ${escapeHtml(error?.message||'Network request failed.')}</div>`;
-            button.disabled=false;button.textContent='Confirm & Publish Tournament';
-          }
-        });
+        out.innerHTML=renderAutoPreview(body.preview,target);
+        wireConfirmTournamentAction();
       }catch(err){out.innerHTML=`<div class="error"><strong>Preview service unavailable.</strong> ${escapeHtml(err.message)}<br><small>Confirm the Supabase Edge Function is deployed and accessible.</small></div>`;}
       finally{autoButton.disabled=false;autoButton.textContent='Fetch & Preview';}
     });
