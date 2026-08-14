@@ -442,21 +442,37 @@ main {
     --header: 92px;
   }
   .app-header {
-    justify-content: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    justify-content: stretch;
+    gap: 4px;
+    padding: 10px;
+  }
+  .brand {
+    grid-column: 2;
+    justify-self: center;
   }
   .brand img {
-    max-width: 155px;
+    width: min(155px, 40vw);
+    max-width: 100%;
   }
   .community-switcher {
-    left: 10px;
+    position: static;
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    min-width: 0;
+    transform: none;
   }
   .community-switcher > span {
     display: none;
   }
   .community-switcher select {
-    width: 105px;
+    width: clamp(64px, 26vw, 105px);
+    max-width: 100%;
     min-height: 40px;
-    padding-left: 8px;
+    padding: 6px 23px 6px 7px;
+    text-overflow: ellipsis;
     font-size: 0.7rem;
   }
   .community-public-context {
@@ -466,7 +482,11 @@ main {
     padding: 11px 13px;
   }
   .menu-button {
-    right: 10px;
+    position: static;
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    transform: none;
     width: 52px;
     height: 52px;
   }
