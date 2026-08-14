@@ -29,7 +29,7 @@ function tournamentDisplayName(t,index=null){
   if(Number.isInteger(index)&&index>=0)return `JakSel T${index+1}`;
   return String(t?.name||'Tournament');
 }
-function getTournaments(){const imported=loadImportedTournaments();const ids=new Set(imported.map(t=>t.id));return [...imported,...TOURNAMENTS.filter(t=>!ids.has(t.id))].sort((a,b)=>{const n=tournamentSequence(a)-tournamentSequence(b);if(n)return n;return String(a.dateISO||a.date||'').localeCompare(String(b.dateISO||b.date||''));});}
+function getTournaments(){const imported=DATA?.currentCommunity&&!DATA.currentCommunity.is_default?[]:loadImportedTournaments();const ids=new Set(imported.map(t=>t.id));return [...imported,...TOURNAMENTS.filter(t=>!ids.has(t.id))].sort((a,b)=>{const n=tournamentSequence(a)-tournamentSequence(b);if(n)return n;return String(a.dateISO||a.date||'').localeCompare(String(b.dateISO||b.date||''));});}
 function getLatestTournament(){const verified=getTournaments().filter(t=>Array.isArray(t.podium)&&t.podium.length);return verified.length?verified[verified.length-1]:null;}
 function saveImportedTournament(t){const current=loadImportedTournaments().filter(x=>x.id!==t.id);current.push(t);localStorage.setItem(ARCHIVE_KEY,JSON.stringify(current));}
 
@@ -80,9 +80,11 @@ function setupCommunitySwitcher(){
   select.disabled=communities.length<2;
   wrapper.hidden=false;
   wrapper.title=communities.length<2?'Only one community is active.':'Switch community';
+  document.title=`FLPR Premium — ${current.display_name}`;
+  document.documentElement.dataset.community=current.slug;
   select.addEventListener('change',()=>{
     if(select.value===current.slug)return;
-    window.FLPR_LIVE?.setCommunitySlug(select.value);
+    window.FLPR_LIVE?.setCommunitySlug(select.value,true);
     document.body.classList.add('community-changing');
     location.hash='home';
     location.reload();
@@ -330,7 +332,8 @@ function rankingIntegrity(players){
 function home(){
   const top10=DATA.players.slice().sort((a,b)=>a.rank-b.rank).slice(0,10);
   const topMover=leaderboard('ratingChange.rankMovement',true)[0];
-  return `<section class="hero"><div class="eyebrow">Padel Tournament Board</div><h1>Every Point Matters.</h1><p>Official tournament results, ranking, handicap, player development, statistics, and hall of fame in one stable platform.</p><div class="actions"><a class="button" href="#tournaments">Tournament Center</a><a class="button secondary" href="#scorecard">Player Scorecards</a></div></section>
+  const community=DATA.currentCommunity||{},communityName=community.display_name||'FLPR Community';
+  return `<section class="community-public-context" aria-label="Current public community"><div><small>Active FLPR community</small><strong>${escapeHtml(communityName)}</strong></div><span>${DATA.players.length} players · ${getTournaments().length} tournaments</span></section><section class="hero"><div class="eyebrow">${escapeHtml(communityName)} · Padel Tournament Board</div><h1>Every Point Matters.</h1><p>Official tournament results, ranking, handicap, player development, statistics, and hall of fame in one stable platform.</p><div class="actions"><a class="button" href="#tournaments">Tournament Center</a><a class="button secondary" href="#scorecard">Player Scorecards</a></div></section>
   <h2 class="section-title">Latest Tournament Podium</h2>${(()=>{const latest=getLatestTournament();return latest?.podium?.length>=3?podium(latest.podium):'<div class="notice">Podium data is not available yet.</div>';})()}
   ${stats([['Players',DATA.players.length],['Tournaments',getTournaments().length],['Valid Matches',DATA.kpis['Valid Matches']],['Top Mover',topMover?.name||'Baseline']])}
   <div class="section-heading"><h2 class="section-title">Current Top 10 Ranking</h2><a href="#ranking">View full ranking →</a></div><div class="ranking-list compact">${top10.map(rankingRow).join('')}</div>

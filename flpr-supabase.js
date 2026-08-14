@@ -28,8 +28,24 @@ window.FLPR_LIVE = (() => {
   async function loadCommunities(){
     return rest('v_flpr_public_communities?select=id,community_code,slug,display_name,is_default,status,active_players,published_tournaments&order=is_default.desc,display_name.asc');
   }
-  function preferredCommunitySlug(){try{return localStorage.getItem(COMMUNITY_KEY)||'';}catch{return '';}}
-  function setCommunitySlug(slug){try{localStorage.setItem(COMMUNITY_KEY,String(slug||''));}catch{}}
+  function requestedCommunitySlug(){
+    try{return String(new URL(location.href).searchParams.get('community')||'').trim().toLowerCase();}
+    catch{return '';}
+  }
+  function preferredCommunitySlug(){
+    const requested=requestedCommunitySlug();
+    if(requested)return requested;
+    try{return localStorage.getItem(COMMUNITY_KEY)||'';}catch{return '';}
+  }
+  function setCommunitySlug(slug,updateUrl=false){
+    const clean=String(slug||'').trim().toLowerCase();
+    try{localStorage.setItem(COMMUNITY_KEY,clean);}catch{}
+    if(updateUrl)try{
+      const url=new URL(location.href);
+      if(clean)url.searchParams.set('community',clean);else url.searchParams.delete('community');
+      history.replaceState(null,'',`${url.pathname}${url.search}${url.hash}`);
+    }catch{}
+  }
   function mergePlayer(row, snapshot){
     const s=row.player_statistics || row.statistics || row || {};
     const name=row.display_name || snapshot?.name || 'Unknown Player';
@@ -315,7 +331,7 @@ window.FLPR_LIVE = (() => {
     if(!communities.length)throw new Error('No active FLPR community is available.');
     const requested=preferredCommunitySlug();
     const community=communities.find(c=>c.slug===requested)||communities.find(c=>c.is_default)||communities[0];
-    setCommunitySlug(community.slug);
+    setCommunitySlug(community.slug,Boolean(requested&&requested!==community.slug));
     // Render the landing page from the minimum live dataset first. Match
     // Explorer, histories, relationships, and championship analytics continue
     // only after the current podium and players are available to the UI.
@@ -337,6 +353,7 @@ window.FLPR_LIVE = (() => {
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
       live:{ok:true,progressive:true,communityId:community.id,communitySlug:community.slug,communityName:community.display_name,players:players.length,tournaments:coreTournaments.length,loadedAt:new Date().toISOString()},
       communities,currentCommunity:community,tournaments:coreTournaments,
+      awards:community.is_default?(snapshot.awards||[]):[],
       championshipRanking:[],championshipHistory:[],championshipSnapshotCount:0
     });
     const [tournaments,historical,relationships,officialHistories,advancedMetrics,championshipRanking,championshipBreakdown,championshipHistory]=await Promise.all([loadTournaments(community,true),loadHistoricalAnalytics(community),loadRelationships(community),loadOfficialHistories(community),loadAdvancedMetrics(community),loadChampionshipRanking(community),loadChampionshipBreakdown(community),loadChampionshipHistory(community)]);
@@ -380,7 +397,7 @@ window.FLPR_LIVE = (() => {
         return {
           tournamentId:t.id,
           tournamentUuid:t.uuid,
-          label:t.name || `JakSel T${index+1}`,
+          label:t.name || `${community.display_name||community.community_code||'Community'} T${index+1}`,
           name:t.name,
           date:t.date,
           dateISO:t.dateISO,
@@ -414,6 +431,7 @@ window.FLPR_LIVE = (() => {
       integrity:{...(snapshot.integrity||{}),playerCount:players.length,liveDatabase:true},
       live:{ok:true,communityId:community.id,communitySlug:community.slug,communityName:community.display_name,players:players.length,tournaments:tournaments.length,relationships:relationships.length,advancedMetrics:advancedMetrics.length,ratingHistory:officialHistories.ratings.length,handicapHistory:officialHistories.handicaps.length,loadedAt:new Date().toISOString()},
       communities,currentCommunity:community,
+      awards:community.is_default?(snapshot.awards||[]):[],
       tournaments,
       championshipRanking,
       championshipHistory,
