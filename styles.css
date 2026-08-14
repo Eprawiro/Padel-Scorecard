@@ -2876,6 +2876,27 @@ main {
 .publication-workflow-actions {
   justify-content: flex-end;
 }
+.publication-approval-list {
+  display: grid;
+  gap: 16px;
+}
+.publication-approval-card {
+  padding: 18px;
+  border: 1px solid rgba(255, 105, 115, 0.22);
+  border-radius: 16px;
+  background: rgba(18, 20, 31, 0.72);
+}
+.approval-confirmation {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.approval-help {
+  color: var(--muted);
+  line-height: 1.45;
+}
 @media (max-width: 800px) {
   .url-action {
     grid-template-columns: 1fr;
@@ -2920,6 +2941,9 @@ main {
   }
   .publication-workflow-actions .button {
     width: 100%;
+  }
+  .publication-approval-card {
+    padding: 14px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
