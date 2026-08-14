@@ -2758,6 +2758,124 @@ main {
 .staging-table {
   min-width: 820px;
 }
+.publication-workflow {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(244, 191, 32, 0.2);
+}
+.publication-workflow-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+.publication-workflow-card {
+  padding: 18px;
+  border: 1px solid rgba(63, 196, 255, 0.18);
+  border-radius: 16px;
+  background: rgba(5, 23, 36, 0.72);
+}
+.publication-workflow-head,
+.publication-workflow-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.publication-workflow-head small {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.publication-workflow-head h4 {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+}
+.publication-state {
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  color: #bcd0df;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.publication-state.requested,
+.publication-state.executing {
+  border-color: rgba(244, 191, 32, 0.45);
+  color: #f4d36d;
+}
+.publication-state.completed {
+  border-color: rgba(64, 210, 145, 0.45);
+  color: #75e8b1;
+}
+.publication-state.failed,
+.publication-state.rejected,
+.publication-state.cancelled {
+  border-color: rgba(255, 105, 115, 0.42);
+  color: #ff9da5;
+}
+.publication-safety {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+.publication-safety > div {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.publication-safety span,
+.publication-safety strong {
+  display: block;
+}
+.publication-safety span {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.publication-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.publication-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.publication-check span {
+  flex: 0 0 auto;
+  font-weight: 900;
+}
+.publication-check p {
+  margin: 0;
+  color: #b8cbd9;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.publication-check.pass span { color: #64dba3; }
+.publication-check.locked span { color: #ff919b; }
+.publication-workflow-note {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0;
+  padding: 12px;
+  border-left: 3px solid #f4bf20;
+  background: rgba(244, 191, 32, 0.055);
+}
+.publication-workflow-note span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.publication-workflow-actions {
+  justify-content: flex-end;
+}
 @media (max-width: 800px) {
   .url-action {
     grid-template-columns: 1fr;
@@ -2774,6 +2892,10 @@ main {
   .preview-result .table-wrap {
     margin-inline: -2px;
   }
+  .publication-safety,
+  .publication-checks {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 430px) {
   .preview-kpis {
@@ -2787,6 +2909,17 @@ main {
   }
   .source-details span {
     margin-top: 4px;
+  }
+  .publication-workflow-card {
+    padding: 14px;
+  }
+  .publication-workflow-head,
+  .publication-workflow-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .publication-workflow-actions .button {
+    width: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {
