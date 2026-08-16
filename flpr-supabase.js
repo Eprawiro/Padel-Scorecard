@@ -19,6 +19,21 @@ window.FLPR_LIVE = (() => {
     return response.json();
   }
   function num(v,fallback=0){ const n=Number(v); return Number.isFinite(n)?n:fallback; }
+  function canonicalMatchCount(tournaments){
+    if(!Array.isArray(tournaments) || !tournaments.length) return 0;
+    if(tournaments.some(t=>t?.matches===null || t?.matches===undefined || t?.matches==='')){
+      throw new Error('Canonical tournament match_count is incomplete.');
+    }
+    const counts=tournaments.map(t=>Number(t.matches));
+    if(counts.some(n=>!Number.isInteger(n) || n<0)){
+      throw new Error('Canonical tournament match_count is incomplete.');
+    }
+    return counts.reduce((sum,n)=>sum+n,0);
+  }
+  function canonicalPlayedMatch(match){
+    if(match?.status!=='completed' || match.scoreA===null || match.scoreB===null) return false;
+    return Number(match.scoreA)!==0 || Number(match.scoreB)!==0;
+  }
   function pctFromDb(v){ const n=num(v); return n<=1 ? n*100 : n; }
   function fmtDate(value){
     if(!value) return 'Date unavailable';
@@ -151,11 +166,11 @@ window.FLPR_LIVE = (() => {
       const tpcols='id,tournament_id,player_id,source_player_name,final_position,total_points,players(display_name)';
       entries=await rest(`tournament_players?select=${encodeURIComponent(tpcols)}&tournament_id=in.(${tournamentIds})&order=final_position.asc`);
     }catch(error){ console.warn('Tournament standings query unavailable',error); }
-    if(includeMatches)try{
+    try{
       const matchCols='id,tournament_id,round_number,court_label,match_number,team_a_score,team_b_score,status';
       const playerCols='match_id,tournament_player_id,team_no,team_slot,result';
       matches=await rest(`matches?select=${encodeURIComponent(matchCols)}&tournament_id=in.(${tournamentIds})&order=round_number.asc,match_number.asc`);
-      if(matches.length){
+      if(includeMatches && matches.length){
         const matchIds=matches.map(x=>x.id).join(',');
         matchPlayers=await rest(`match_players?select=${encodeURIComponent(playerCols)}&match_id=in.(${matchIds})&order=team_no.asc,team_slot.asc`);
       }
@@ -205,7 +220,7 @@ window.FLPR_LIVE = (() => {
         date:fmtDate(t.tournament_date||t.published_at||t.imported_at),
         dateISO:String(t.tournament_date||t.published_at||t.imported_at||'').slice(0,10),
         location:community.display_name,format:t.format||'Americano',
-        players:playerCount,rounds:num(t.round_count),matches:num(t.match_count),
+        players:playerCount,rounds:num(t.round_count),matches:matchDetails.filter(canonicalPlayedMatch).length,
         totalPoints,
         averagePoints:playerCount ? totalPoints/playerCount : null,
         podium,
@@ -341,7 +356,7 @@ window.FLPR_LIVE = (() => {
     ]);
     const coreKpis={...(snapshot.kpis||{})};
     coreKpis.Players=players.length;
-    coreKpis['Valid Matches']=Math.round(players.reduce((a,p)=>a+p.matches,0)/4);
+    coreKpis['Valid Matches']=canonicalMatchCount(coreTournaments);
     coreKpis['Total Wins']=players.reduce((a,p)=>a+p.wins,0);
     coreKpis['Average Matches / Player']=players.length?Number((players.reduce((a,p)=>a+p.matches,0)/players.length).toFixed(1)):0;
     coreKpis['Average Win Rate']=players.length?Number((players.reduce((a,p)=>a+p.winRate,0)/players.length).toFixed(1)):0;
@@ -419,7 +434,7 @@ window.FLPR_LIVE = (() => {
     }
     const kpis={...(snapshot.kpis||{})};
     kpis.Players=players.length;
-    kpis['Valid Matches']=Math.round(players.reduce((a,p)=>a+p.matches,0)/4);
+    kpis['Valid Matches']=canonicalMatchCount(tournaments);
     kpis['Total Wins']=players.reduce((a,p)=>a+p.wins,0);
     kpis['Average Matches / Player']=players.length?Number((players.reduce((a,p)=>a+p.matches,0)/players.length).toFixed(1)):0;
     kpis['Average Win Rate']=players.length?Number((players.reduce((a,p)=>a+p.winRate,0)/players.length).toFixed(1)):0;
